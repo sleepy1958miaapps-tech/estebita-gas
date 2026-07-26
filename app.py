@@ -351,20 +351,22 @@ def reporte_diario():
     )
 
 # =========================================================
+## =========================================================
 # 7. GESTIÓN DE PEDIDOS / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
 def seguimiento_pedidos():
-    fecha_actual = request.args.get("fecha", date.today().strftime("%Y-%m-%d"))
-    busqueda = request.args.get("busqueda", "")
-    ref_punto = request.args.get("ref_punto", "")
-    estado = request.args.get("estado", "")
+    fecha_actual = request.args.get("fecha", "")
+    busqueda = request.args.get("busqueda", "").strip()
+    ref_punto = request.args.get("ref_punto", "").strip()
+    estado = request.args.get("estado", "").strip()
 
     conn = sqlite3.connect("estebita.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     try:
+        # Consulta base
         query = """
             SELECT 
                 p.*, 
@@ -373,9 +375,31 @@ def seguimiento_pedidos():
                 c.telefono 
             FROM pedidos p
             LEFT JOIN clientes c ON CAST(p.cedula_cliente AS TEXT) = CAST(c.cedula AS TEXT)
-            ORDER BY p.id DESC
+            WHERE 1=1
         """
-        cursor.execute(query)
+        params = []
+
+        # Aplicar filtros dinámicos si el usuario los envía
+        if fecha_actual:
+            query += " AND DATE(p.fecha) = ?"
+            params.append(fecha_actual)
+
+        if busqueda:
+            query += " AND (p.cedula_cliente LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ?)"
+            term = f"%{busqueda}%"
+            params.extend([term, term, term, term])
+
+        if ref_punto:
+            query += " AND p.referencia LIKE ?"
+            params.append(f"%{ref_punto}%")
+
+        if estado:
+            query += " AND p.estado = ?"
+            params.append(estado)
+
+        query += " ORDER BY p.id DESC"
+
+        cursor.execute(query, params)
         pedidos_raw = cursor.fetchall()
         pedidos = [dict(row) for row in pedidos_raw]
 
@@ -393,6 +417,32 @@ def seguimiento_pedidos():
         ref_punto=ref_punto,
         estado_filtro=estado
     )
+
+
+@app.route('/actualizar_estado_pedidos', methods=['POST'])
+def actualizar_estado_pedidos():
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        nuevo_estado = data.get('nuevo_estado', '')
+
+        if not ids or not nuevo_estado:
+            return jsonify({'status': 'error', 'message': 'Datos incompletos'}), 400
+
+        conn = sqlite3.connect("estebita.db")
+        cursor = conn.cursor()
+        
+        placeholders = ','.join(['?'] * len(ids))
+        query = f"UPDATE pedidos SET estado = ? WHERE id IN ({placeholders})"
+        
+        cursor.execute(query, [nuevo_estado] + ids)
+        conn.commit()
+        conn.close()
+
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print("Error al actualizar estados:", e)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # =========================================================
 # ARRANQUE DEL SERVIDOR
