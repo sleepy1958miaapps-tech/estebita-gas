@@ -45,11 +45,11 @@
                     </h3>
                 </a>
                 <nav class="mt-4">
-                  <!-- 1. Botón para volver al Inicio -->
+             <!-- 1. Botón para volver al Inicio -->
                   <a href="{{ url_for('index') }}"><i class="fa-solid fa-house me-2"></i>Inicio</a>
               
-                  <!-- Enlaces que ya tenías -->
-                  <a href="/pedidos"><i class="fa-solid fa-cart-plus me-2"></i>Registrar Pedido</a>
+                  <!-- Enlaces corregidos -->
+                  <a href="{{ url_for('nuevo_pedido') }}"><i class="fa-solid fa-cart-plus me-2"></i>Registrar Pedido</a>
                   <a href="{{ url_for('seguimiento_pedidos') }}"><i class="fa-solid fa-truck me-2"></i>Gestión de Pedidos</a>
                   <a href="/clientes"><i class="fa-solid fa-users me-2"></i>Lista de Clientes</a>
                   <a href="/reporte-diario"><i class="fa-solid fa-chart-line me-2"></i>Reporte Diario</a>
