@@ -361,8 +361,7 @@ def reporte_diario():
         total_monto=total_monto,
         total_clientes=total_clientes,
     )
-# =========================================================
-=====# GESTIÓN DE PEDIDOS / LOGÍSTICA
+# GESTIÓN DE PEDIDOS / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
 def seguimiento_pedidos():
