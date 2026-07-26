@@ -393,7 +393,7 @@ def seguimiento_pedidos():
     finally:
         conn.close()
 
-    return render_template("gestion_pedidos.html", pedidos=pedidos)
+    return render_template("seguimiento_pedidos.html", pedidos=pedidos)
 # ====================================================
 # ARRANQUE DEL SERVIDOR
 # =========================================================

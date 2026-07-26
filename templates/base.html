@@ -45,7 +45,7 @@
                     </h3>
                 </a>
                 <nav class="mt-4">
-             <!-- 1. Botón para volver al Inicio -->
+                  <!-- 1. Botón para volver al Inicio -->
                   <a href="{{ url_for('index') }}"><i class="fa-solid fa-house me-2"></i>Inicio</a>
               
                   <!-- Enlaces corregidos -->
@@ -89,7 +89,7 @@
                             </a>
                         </div>
                         <div class="col-md-5">
-                            <a href="/pedidos" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
+                            <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
                                 <i class="fa-solid fa-cart-plus me-2"></i> Registrar Pedido
                             </a>
                         </div>
