@@ -7,7 +7,7 @@
     <!-- PANEL DE BÚSQUEDA Y FILTROS -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ url_for('seguimiento de pedidos') }}" class="row g-3">
+            <form method="GET" action="{{ url_for('seguimiento_de_pedidos') }}" class="row g-3">
                 <!-- Filtro de Fecha -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold">Fecha</label>
@@ -39,7 +39,7 @@
                 </div>
 
                 <div class="col-12 text-end mt-3">
-                    <a href="{{ url_for('seguimiento de pedidos') }}" class="btn btn-outline-secondary me-2">Limpiar Filtros</a>
+                    <a href="{{ url_for('seguimiento_de_pedidos') }}" class="btn btn-outline-secondary me-2">Limpiar Filtros</a>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button>
                 </div>
             </form>
