@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Estebita Gas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 2.5rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            background: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-primary"><i class="bi bi-fuel-pump-fill"></i> Estebita Gas</h2>
+        <p class="text-muted small">Ingresa tus credenciales para acceder</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger py-2 text-center" role="alert">
+        <small><i class="bi bi-exclamation-triangle"></i> {{ error }}</small>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+        <div class="mb-3">
+            <label for="usuario" class="form-label fw-bold small">Usuario</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control" id="usuario" name="usuario" required autofocus placeholder="Ej: Samantha25">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="clave" class="form-label fw-bold small">Contraseña</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control" id="clave" name="clave" required placeholder="••••••••">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-3">
+            <i class="bi bi-box-arrow-in-right"></i> Entrar al Sistema
+        </button>
+
+        <!-- Botón / Auxilio de Clave Olvidada -->
+        <div class="text-center">
+            <!-- Enlace corregido con tu nombre -->
+<a href="https://wa.me/584243611287?text=Hola%20Richard,%20se%20me%20olvid%C3%B3%20mi%20contrase%C3%B1a%20para%20entrar%20al%20sistema%20de%20Estebita%20Gas." 
+target="_blank" 
+class="text-decoration-none small text-muted">
+ <i class="bi bi-whatsapp text-success"></i> ¿Olvidaste tu contraseña?
+</a>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>

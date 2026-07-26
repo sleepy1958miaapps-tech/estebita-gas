@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <!-- Encabezado con Botones Superiores -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="text-primary m-0">
+                    <i class="bi bi-people-fill me-2"></i>Directorio de Clientes
+                </h3>
+                <div>
+                    <button id="btnEditarTabla" class="btn btn-outline-primary me-2" onclick="habilitarEdicion()">
+                        <i class="bi bi-pencil-square"></i> Editar
+                    </button>
+                    <button id="btnGuardarTabla" class="btn btn-success d-none me-2" onclick="guardarEdicion()">
+                        <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                    <a href="/" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left-circle"></i> Volver
+                    </a>
+                </div>
+            </div>
+
+            <!-- Buscador -->
+            <div class="mb-3">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar por cédula, nombre, teléfono o dirección...">
+                </div>
+            </div>
+
+            <!-- Tabla de Clientes -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="tablaClientes">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cédula</th>
+                            <th>Nombre</th>
+                            <th>Apellido</th>
+                            <th>Teléfono</th>
+                            <th>Dirección</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tbody>
+                            {% for cliente in clientes %}
+                            <tr>
+                                <td>{{ cliente.cedula }}</td>
+                                <td>{{ cliente.nombre }}</td>
+                                <td>{{ cliente.apellido }}</td>
+                                <td>{{ cliente.telefono }}</td>
+                                <td>{{ cliente.direccion }}</td>
+                            </tr>
+                            {% endfor %}
+                        
+                        </tbody>
+    </div>
+</div>
+
+<script>
+// Lógica de Búsqueda
+document.getElementById('buscarCliente').addEventListener('keyup', function() {
+    let filtro = this.value.toLowerCase();
+    let filas = document.querySelectorAll('#tablaClientes tbody tr');
+
+    filas.forEach(fila => {
+        let textoFila = fila.innerText.toLowerCase();
+        fila.style.display = textoFila.includes(filtro) ? '' : 'none';
+    });
+});
+
+// Habilitar la edición de todas las celdas
+function habilitarEdicion() {
+    document.querySelectorAll('.dato-texto').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.dato-input').forEach(el => el.classList.remove('d-none'));
+    
+    document.getElementById('btnEditarTabla').classList.add('d-none');
+    document.getElementById('btnGuardarTabla').classList.remove('d-none');
+}
+
+// Guardar los cambios realizados
+function guardarEdicion() {
+    document.querySelectorAll('#tablaClientes tbody tr').forEach(fila => {
+        fila.querySelectorAll('td').forEach(td => {
+            let input = td.querySelector('.dato-input');
+            let texto = td.querySelector('.dato-texto');
+            if (input && texto) {
+                texto.innerText = input.value || 'N/A';
+            }
+        });
+    });
+
+    document.querySelectorAll('.dato-input').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.dato-texto').forEach(el => el.classList.remove('d-none'));
+    
+    document.getElementById('btnGuardarTabla').classList.add('d-none');
+    document.getElementById('btnEditarTabla').classList.remove('d-none');
+}
+</script>
+{% endblock %}

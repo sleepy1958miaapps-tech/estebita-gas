@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="bi bi-truck"></i> Gestión y Logística de Pedidos</h2>
+
+    <!-- PANEL DE BÚSQUEDA Y FILTROS -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('gestion_pedidos') }}" class="row g-3">
+                <!-- Filtro de Fecha -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Fecha</label>
+                    <input type="date" name="fecha" class="form-control" value="{{ fecha_actual }}">
+                </div>
+
+                <!-- Búsqueda por cliente -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Cliente / Teléfono</label>
+                    <input type="text" name="busqueda" class="form-control" placeholder="Cédula, nombre o tlf..." value="{{ busqueda }}">
+                </div>
+
+                <!-- Referencia Punto de Venta -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Ref. Punto de Venta</label>
+                    <input type="text" name="ref_punto" class="form-control" placeholder="N° Referencia..." value="{{ ref_punto }}">
+                </div>
+
+                <!-- Filtro de Estado -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="Recibido" {% if estado_filtro == 'Recibido' %}selected{% endif %}>1. Recibido</option>
+                        <option value="En transito" {% if estado_filtro == 'En transito' %}selected{% endif %}>2. En tránsito</option>
+                        <option value="Listo para entregar" {% if estado_filtro == 'Listo para entregar' %}selected{% endif %}>3. Listo para entregar</option>
+                        <option value="Retirado" {% if estado_filtro == 'Retirado' %}selected{% endif %}>4. Retirado</option>
+                    </select>
+                </div>
+
+                <div class="col-12 text-end mt-3">
+                    <a href="{{ url_for('gestion_pedidos') }}" class="btn btn-outline-secondary me-2">Limpiar Filtros</a>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ACCIONES EN LOTE PARA EL CAMIÓN -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="marcarTodos(true)">
+                <i class="bi bi-check-square"></i> Seleccionar Todos
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="marcarTodos(false)">
+                <i class="bi bi-square"></i> Desmarcar Todos
+            </button>
+        </div>
+        <div>
+            <button class="btn btn-warning fw-bold me-2" onclick="cambiarEstadoLote('En transito')">
+                <i class="bi bi-truck"></i> Pasar a "En tránsito"
+            </button>
+            <button class="btn btn-info text-white fw-bold me-2" onclick="cambiarEstadoLote('Listo para entregar')">
+                <i class="bi bi-box-seam"></i> "Listo para Entregar"
+            </button>
+            <button class="btn btn-success fw-bold" onclick="cambiarEstadoLote('Retirado')">
+                <i class="bi bi-check-circle"></i> "Retirado (Cerrar)"
+            </button>
+        </div>
+    </div>
+
+    <!-- TABLA DE PEDIDOS -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th width="40"><input type="checkbox" id="check-master" onclick="toggleMaster(this)"></th>
+                            <th>ID / Ticket</th>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Cilindro</th>
+                            <th>Monto</th>
+                            <th>Pago / Ref</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pedidos %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="check-pedido" value="{{ p.id }}">
+                            </td>
+                            <td>
+                                <strong>#{{ p.id }}</strong><br>
+                                <small class="text-muted">Tkt: {{ p.tickets or 'N/A' }}</small>
+                            </td>
+                            <td>
+                                {{ p.nombre }} {{ p.apellido }}<br>
+                                <small class="text-muted">V-{{ p.cedula_cliente }}</small>
+                            </td>
+                            <td>{{ p.telefono or '-' }}</td>
+                            <td><span class="badge bg-secondary">{{ p.tamano_cilindro }}</span> (x{{ p.cantidad_bombonas }})</td>
+                            <td><strong>{{ p.monto_bs }} Bs.</strong></td>
+                            <td>
+                                <small>{{ p.metodo_pago }}</small><br>
+                                <small class="text-muted">{{ p.referencia or 'Sin ref' }}</small>
+                            </td>
+                            <td>
+                                {% if p.estado == 'Recibido' %}
+                                    <span class="badge bg-secondary">1. Recibido</span>
+                                {% elif p.estado == 'En transito' %}
+                                    <span class="badge bg-warning text-dark">2. En tránsito</span>
+                                {% elif p.estado == 'Listo para entregar' %}
+                                    <span class="badge bg-info text-dark">3. Listo p/ Entregar</span>
+                                {% elif p.estado == 'Retirado' %}
+                                    <span class="badge bg-success">4. Retirado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ p.estado }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                No se encontraron pedidos con los filtros seleccionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleMaster(master) {
+    document.querySelectorAll('.check-pedido').forEach(chk => chk.checked = master.checked);
+}
+
+function marcarTodos(estado) {
+    document.querySelectorAll('.check-pedido').forEach(chk => chk.checked = estado);
+    document.getElementById('check-master').checked = estado;
+}
+
+function cambiarEstadoLote(nuevoEstado) {
+    const seleccionados = Array.from(document.querySelectorAll('.check-pedido:checked')).map(c => c.value);
+
+    if (seleccionados.length === 0) {
+        alert("⚠️ Por favor seleccione al menos un pedido de la lista.");
+        return;
+    }
+
+    if (!confirm(`¿Desea cambiar los ${seleccionados.length} pedidos seleccionados al estado "${nuevoEstado}"?`)) {
+        return;
+    }
+
+    fetch('/actualizar_estado_pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'json/application' },
+        body: JSON.stringify({
+            ids: seleccionados,
+            nuevo_estado: nuevoEstado
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert("Error al actualizar: " + data.message);
+        }
+    })
+    .catch(err => alert("Error de conexión al servidor."));
+}
+</script>
+{% endblock %}

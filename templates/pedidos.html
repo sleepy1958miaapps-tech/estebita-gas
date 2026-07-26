@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Guardamos la tasa recibida de app.py para que JS la lea -->
+<input type="hidden" id="tasa_cambio" value="{{ tasa_dolar }}">
+<div class="container mt-3" style="max-width: 500px;">
+    <h3 class="text-center mb-3">📦 Registrar Nuevo Pedido</h3>
+
+    <!-- PASO 1: CÉDULA / CLIENTE -->
+    <div class="card p-3 shadow-sm mb-3" id="paso-cliente">
+        <h5 class="card-title mb-3">1. Identificación del Cliente</h5>
+        <div class="input-group mb-2">
+            <input type="text" id="cedula_input" class="form-control" placeholder="Ingrese Cédula / ID..." onkeypress="if(event.key==='Enter') buscarCliente()">
+            <button class="btn btn-primary" type="button" onclick="buscarCliente()">Buscar</button>
+        </div>
+
+        <div id="resultado-cliente" class="mt-2" style="display: none;"></div>
+    </div>
+
+    <!-- PASO 2: SELECCIÓN DE BOMBONAS -->
+    <div class="card p-3 shadow-sm mb-3 opacity-50" id="paso-bombonas" style="pointer-events: none;">
+        <h5 class="card-title mb-3">2. Detalle de Bombonas</h5>
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold">Tamaño de Bombona:</label>
+            <select id="tamano_cilindro" class="form-select" onchange="validarTicketsExistentes()">
+                <option value="10kg" selected>10 kg (Rango 001 - 120)</option>
+                <option value="18kg">18 kg (Rango 121 - 150)</option>
+                <option value="21kg">21 kg (Rango 151 - 200)</option>
+                <option value="28kg">28 kg (Rango 151 - 200)</option>
+                <option value="43kg">43 kg (Rango 201 - 250)</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Cantidad de bombonas:</label>
+            <input type="number" id="cantidad_bombonas" class="form-control" value="1" min="1" max="10" onchange="generarCamposTickets()" onkeyup="generarCamposTickets()">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Número(s) de Ticket (3 dígitos):</label>
+            <div id="contenedor-tickets" class="d-flex flex-column gap-2"></div>
+        </div>
+
+       <!-- Guardamos la tasa que viene de app.py -->
+<input type="hidden" id="tasa_cambio" value="{{ tasa_dolar }}">
+
+<div class="mb-3">
+    <label class="form-label fw-bold">Monto Total a Cobrar (Bs):</label>
+    <div class="input-group">
+        <span class="input-group-text bg-success text-white fw-bold">Bs.</span>
+        <input type="text" id="monto_bs" class="form-control fw-bold text-success fs-5" readonly placeholder="0.00">
+    </div>
+</div>
+
+        <button type="button" class="btn btn-success w-100" onclick="validarYPasarAPago()">Continuar al Pago ➔</button>
+    </div>
+
+    <!-- PASO 3: MÉTODO DE PAGO Y REFERENCIAS -->
+    <div class="card p-3 shadow-sm mb-3 opacity-50" id="paso-pago" style="pointer-events: none;">
+        <h5 class="card-title mb-3">3. Forma de Pago</h5>
+        
+        <div class="d-grid gap-2 mb-3">
+            <button class="btn btn-outline-primary btn-lg" onclick="seleccionarMetodo('Punto de Venta')">💳 Punto de Venta</button>
+            <button class="btn btn-outline-success btn-lg" onclick="seleccionarMetodo('Pago Móvil')">📱 Pago Móvil (Cta Personal)</button>
+            <button class="btn btn-outline-warning btn-lg" onclick="seleccionarMetodo('Efectivo')">💵 Efectivo</button>
+        </div>
+
+        <!-- Campos dinámicos de Referencias -->
+        <div id="bloque-referencias" class="mt-3" style="display: none;">
+            
+            <!-- Referencia Pago Móvil -->
+            <div id="campo-ref-pagomovil" class="mb-3" style="display: none;">
+                <label class="form-label fw-bold">1. Ref. Pago Móvil del Cliente:</label>
+                <input type="text" id="ref_pagomovil" class="form-control" placeholder="Ej. 123456">
+            </div>
+
+            <!-- Referencia Punto de Venta -->
+            <div class="mb-3">
+                <label class="form-label fw-bold" id="label-ref-punto">Ref. Punto de Venta Empresa:</label>
+                <input type="text" id="ref_punto" class="form-control" placeholder="Ej. 654321">
+            </div>
+
+            <button class="btn btn-success w-100 btn-lg" onclick="confirmarVenta()">Confirmar y Registrar Venta</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+let clienteSeleccionadoId = null;
+let metodoPagoSeleccionado = '';
+
+// Precios unitarios en USD
+const PRECIOS = {
+    '10kg': 4,
+    '18kg': 10,
+    '21kg': 13,
+    '28kg': 15,
+    '43kg': 20
+};
+
+const RANGOS_TICKETS = {
+    '10kg': { min: 1, max: 120 },
+    '18kg': { min: 121, max: 150 },
+    '21kg': { min: 151, max: 200 },
+    '28kg': { min: 151, max: 200 },
+    '43kg': { min: 201, max: 250 }
+};
+
+function buscarCliente() {
+    const cedula = document.getElementById('cedula_input').value.trim();
+    const divRes = document.getElementById('resultado-cliente');
+
+    if (!cedula) {
+        alert("Por favor ingrese un número de cédula.");
+        return;
+    }
+
+    fetch(`/buscar_cliente/${cedula}`)
+        .then(res => res.json())
+        .then(data => {
+            divRes.style.display = 'block';
+            if (data.existe) {
+                clienteSeleccionadoId = data.cedula || data.id;
+                divRes.innerHTML = `
+                    <div class="alert alert-success m-0">
+                        <strong>¡Cliente encontrado!</strong><br>
+                        <b>Cédula:</b> ${data.cedula || ''}<br>
+                        <b>Nombre:</b> ${data.nombre || ''}<br>
+                        <b>Apellido:</b> ${data.apellido || ''}<br>
+                        <b>Teléfono:</b> ${data.telefono || ''}<br>
+                        <b>Dirección:</b> ${data.direccion || 'No registrada'}
+                    </div>
+                `;
+                desbloquearPasoBombonas();
+            } else {
+                clienteSeleccionadoId = null;
+                divRes.innerHTML = `
+                    <div class="alert alert-danger m-0 text-center">
+                        <strong>El cliente no existe.</strong><br>
+                        <div class="d-flex gap-2 justify-content-center mt-2">
+                            <a href="/clientes" class="btn btn-sm btn-danger">Crear Cliente</a>
+                            <button class="btn btn-sm btn-secondary" onclick="limpiarBusqueda()">Volver</button>
+                        </div>
+                    </div>
+                `;
+                bloquearPasoBombonas();
+            }
+        });
+}
+
+function limpiarBusqueda() {
+    document.getElementById('cedula_input').value = '';
+    document.getElementById('resultado-cliente').style.display = 'none';
+    bloquearPasoBombonas();
+}
+
+function desbloquearPasoBombonas() {
+    const paso = document.getElementById('paso-bombonas');
+    paso.classList.remove('opacity-50');
+    paso.style.pointerEvents = 'auto';
+    generarCamposTickets();
+}
+
+function bloquearPasoBombonas() {
+    const paso = document.getElementById('paso-bombonas');
+    paso.classList.add('opacity-50');
+    paso.style.pointerEvents = 'none';
+    bloquearPasoPago();
+}
+
+function bloquearPasoPago() {
+    const paso = document.getElementById('paso-pago');
+    paso.classList.add('opacity-50');
+    paso.style.pointerEvents = 'none';
+    document.getElementById('bloque-referencias').style.display = 'none';
+}
+
+function generarCamposTickets() {
+    const cant = parseInt(document.getElementById('cantidad_bombonas').value) || 1;
+    const cont = document.getElementById('contenedor-tickets');
+    cont.innerHTML = '';
+
+    for (let i = 1; i <= cant; i++) {
+        cont.innerHTML += `
+            <input type="text" class="form-control ticket-input mb-2" placeholder="Ticket bombona #${i} (ej. 002)" maxlength="3" onblur="formatearYValidarTicket(this)">
+        `;
+    }
+    
+    // Recalcula el monto inmediatamente al cambiar cantidades de bombonas
+    calcularMonto();
+}
+
+// Nueva función que calcula automáticamente el monto en USD y Bs
+// BORRA ESTO:
+function calcularMonto() {
+    const cant = parseInt(document.getElementById('cantidad_bombonas')?.value) || 0;
+    const tamano = document.getElementById('tamano_cilindro')?.value || '10kg';
+    
+    // Precio base en USD
+    const precioUnitarioUSD = PRECIOS[tamano] || 0;
+    const totalUSD = cant * precioUnitarioUSD;
+
+    // Leemos la tasa que pasó Flask desde estebita.db
+    const tasaElem = document.getElementById('tasa_cambio');
+    const tasa = parseFloat(tasaElem?.value) || 0;
+
+    // Calculamos estrictamente en Bolívares
+    const totalBS = totalUSD * tasa;
+
+    // Asignamos el resultado redondeado a 2 decimales
+    const inputMonto = document.getElementById('monto_bs');
+    if (inputMonto) {
+        inputMonto.value = totalBS.toFixed(2);
+    }
+}
+
+function formatearYValidarTicket(input) {
+    let val = input.value.trim();
+    if (!val) return;
+
+    let num = parseInt(val, 10);
+    const tamano = document.getElementById('tamano_cilindro').value;
+    const rango = RANGOS_TICKETS[tamano];
+
+    if (isNaN(num) || num < rango.min || num > rango.max) {
+        alert(`❌ Número de ticket inválido.\nPara bombonas de ${tamano}, el ticket debe estar entre ${String(rango.min).padStart(3, '0')} y ${String(rango.max).padStart(3, '0')}.`);
+        input.value = '';
+        input.focus();
+        return;
+    }
+
+    input.value = String(num).padStart(3, '0');
+}
+
+function validarTicketsExistentes() {
+    const inputs = document.querySelectorAll('.ticket-input');
+    inputs.forEach(input => {
+        if(input.value) formatearYValidarTicket(input);
+    });
+    calcularMonto();
+}
+
+function validarYPasarAPago() {
+    const inputsTickets = document.querySelectorAll('.ticket-input');
+    let todosValidos = true;
+
+    if (inputsTickets.length === 0) {
+        alert("⚠️ No hay campos de tickets generados.");
+        return;
+    }
+
+    // Validamos uno por uno que no estén vacíos
+    inputsTickets.forEach((input) => {
+        const val = input.value.trim();
+        if (!val || val.length === 0) {
+            todosValidos = false;
+            input.classList.add('is-invalid'); // Marca la casilla en rojo
+        } else {
+            input.classList.remove('is-invalid');
+        }
+    });
+
+    if (!todosValidos) {
+        alert("❌ Debe ingresar todos los números de ticket obligatoriamente para continuar.");
+        return;
+    }
+
+    // Validamos el monto
+    const inputMonto = document.getElementById('monto_bs');
+    const monto = parseFloat(inputMonto ? inputMonto.value : 0);
+
+    if (isNaN(monto) || monto <= 0) {
+        alert("⚠️ Por favor asegúrese de que el monto total a cobrar sea mayor a 0.");
+        return;
+    }
+
+    // Si todo está correcto, desbloqueamos la sección de pago
+    const pasoPago = document.getElementById('paso-pago');
+    pasoPago.classList.remove('opacity-50');
+    pasoPago.style.pointerEvents = 'auto';
+    
+    // Hacemos scroll suave hacia las formas de pago
+    pasoPago.scrollIntoView({ behavior: 'smooth' });
+}
+
+function seleccionarMetodo(metodo) {
+    metodoPagoSeleccionado = metodo;
+    const bloque = document.getElementById('bloque-referencias');
+    const campoPM = document.getElementById('campo-ref-pagomovil');
+    const labelPunto = document.getElementById('label-ref-punto');
+
+    document.getElementById('ref_pagomovil').value = '';
+    document.getElementById('ref_punto').value = '';
+    bloque.style.display = 'block';
+
+    if (metodo === 'Pago Móvil') {
+        campoPM.style.display = 'block';
+        labelPunto.innerText = "2. Ref. Punto de Venta (Tarjeta Operador):";
+        document.getElementById('ref_pagomovil').focus();
+    } else if (metodo === 'Efectivo') {
+        campoPM.style.display = 'none';
+        labelPunto.innerText = "Ref. Punto de Venta (Pago con Tarjeta Operador):";
+        document.getElementById('ref_punto').focus();
+    } else {
+        campoPM.style.display = 'none';
+        labelPunto.innerText = "Ref. Punto de Venta Empresa:";
+        document.getElementById('ref_punto').focus();
+    }
+}
+
+function confirmarVenta() {
+    const refPunto = document.getElementById('ref_punto').value.trim();
+
+    if (!refPunto) {
+        alert("⚠️ Debe ingresar el número de referencia del Punto de Venta.");
+        return;
+    }
+
+    if (metodoPagoSeleccionado === 'Pago Móvil') {
+        const refPM = document.getElementById('ref_pagomovil').value.trim();
+        if (!refPM) {
+            alert("⚠️ Debe ingresar el número de referencia del Pago Móvil recibido.");
+            return;
+        }
+    }
+
+    alert(`✅ ¡Venta Registrada Exitosamente!\nOrigen: ${metodoPagoSeleccionado}\nTransacción procesada por Punto de Venta.`);
+    window.location.href = '/pedidos';
+}
+</script>
+{% endblock %}

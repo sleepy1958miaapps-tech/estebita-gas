@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Estebita Gas{% endblock %}</title>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            min-height: 100vh;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+        }
+        .sidebar a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            padding: 12px 20px;
+            display: block;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 p-3 sidebar">
+                <a href="/" class="text-white text-decoration-none">
+                    <h3 class="text-center py-3 border-bottom border-light">
+                        <i class="fa-solid fa-fire-flame-curved me-2"></i>Estebita Gas
+                    </h3>
+                </a>
+                <nav class="mt-4">
+                  <!-- 1. Botón para volver al Inicio -->
+                  <a href="{{ url_for('index') }}"><i class="fa-solid fa-house me-2"></i>Inicio</a>
+              
+                  <!-- Enlaces que ya tenías -->
+                  <a href="/pedidos"><i class="fa-solid fa-cart-plus me-2"></i>Registrar Pedido</a>
+                  <a href="{{ url_for('gestion_pedidos') }}"><i class="fa-solid fa-truck me-2"></i>Gestión de Pedidos</a>
+                  <a href="/clientes"><i class="fa-solid fa-users me-2"></i>Lista de Clientes</a>
+                  <a href="/reporte-diario"><i class="fa-solid fa-chart-line me-2"></i>Reporte Diario</a>
+                  <a href="/whatsapp"><i class="fa-brands fa-whatsapp me-2"></i>Notificaciones</a>
+                  <a href="/precios"><i class="fa-solid fa-tags me-2"></i>Configurar Precios</a>
+              
+                  <!-- 2. Usuario activo y Botón para Cerrar Sesión -->
+                  {% if session.get('usuario') %}
+                      <hr class="text-white-50 my-3">
+                      <div class="px-3 mb-2 text-white-50 small">
+                          <i class="fa-solid fa-user me-2"></i>{{ session['usuario'] }}
+                      </div>
+                      <a href="{{ url_for('logout') }}" class="text-danger fw-bold">
+                          <i class="fa-solid fa-right-from-bracket me-2"></i>Cerrar Sesión
+                      </a>
+                  {% endif %}
+              </nav>
+            </div>
+
+            <!-- Contenido Principal -->
+            <div class="col-md-9 col-lg-10 p-4">
+                {% block content %}
+                <!-- Menú de Inicio cuando estás en / -->
+                <div class="text-center my-5">
+                    <h2 class="text-primary fw-bold mb-4">Sistema Estebita Gas</h2>
+                    <p class="text-muted">Selecciona una opción del menú para comenzar:</p>
+                    
+                    <div class="row justify-content-center g-3 mt-3">
+                        <div class="col-md-5">
+                            <a href="/clientes" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
+                                <i class="fa-solid fa-users me-2"></i> Directorio de Clientes
+                            </a>
+                        </div>
+                        <div class="col-md-5">
+                            <a href="/precios" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
+                                <i class="fa-solid fa-tags me-2"></i> Lista de Precios
+                            </a>
+                        </div>
+                        <div class="col-md-5">
+                            <a href="/pedidos" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
+                                <i class="fa-solid fa-cart-plus me-2"></i> Registrar Pedido
+                            </a>
+                        </div>
+                        <div class="col-md-5">
+                            <a href="{{ url_for('gestion_pedidos') }}" class="btn btn-outline-primary btn-lg w-100 py-3 shadow-sm">
+                                <i class="fa-solid fa-truck me-2"></i> Gestión y Logística
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
