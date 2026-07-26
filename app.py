@@ -46,14 +46,12 @@ def logout():
     return redirect(url_for('login'))
 
 # =========================================================
-# =========================================================
-# ACTUALIZACIÓN SEGURA DE BASE DE DATOS (Agrega columnas si faltan)
+# ACTUALIZACIÓN SEGURA DE BASE DE DATOS
 # =========================================================
 def actualizar_base_datos():
     conn = sqlite3.connect("estebita.db")
     cursor = conn.cursor()
     
-    # 1. Tabla configuracion (Tasa)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS configuracion (
             id INTEGER PRIMARY KEY,
@@ -61,7 +59,6 @@ def actualizar_base_datos():
         )
     """)
 
-    # 2. Tabla pedidos (Estructura base)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,11 +76,10 @@ def actualizar_base_datos():
         )
     """)
 
-    # 3. Lista de columnas por si la tabla ya existía de antes
     columnas_necesarias = [
         ("cedula_cliente", "TEXT"),
         ("cantidad_bombonas", "INTEGER"),
-        ("monto_bs", "REAL DEFAULT 0.0"),  # <--- ESTA ES LA QUE FALTABA
+        ("monto_bs", "REAL DEFAULT 0.0"),
         ("estado", "TEXT DEFAULT 'Recibido'"),
         ("tickets", "TEXT"),
         ("metodo_pago", "TEXT"),
@@ -94,20 +90,19 @@ def actualizar_base_datos():
         try:
             cursor.execute(f"ALTER TABLE pedidos ADD COLUMN {columna} {tipo}")
         except sqlite3.OperationalError:
-            # Si la columna ya existe, SQLite simplemente continua
             pass
 
     conn.commit()
     conn.close()
 
-# Se ejecuta siempre al arrancar Flask
 actualizar_base_datos()
+
+# =========================================================
 # 1. INICIO / DASHBOARD
 # =========================================================
 @app.route('/')
 def index():
     return render_template('base.html')
-
 
 # =========================================================
 # 2. CLIENTES
@@ -137,19 +132,18 @@ def registrar_cliente():
 
     return redirect(url_for('clientes'))
 
-
 # =========================================================
 # 3. REGISTRAR PEDIDOS & BÚSQUEDA
 # =========================================================
 @app.route("/nuevo_pedido")
 def nuevo_pedido():
-    tasa_actual = 74.20
+    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
     try:
         conn = sqlite3.connect("estebita.db")
         cursor = conn.cursor()
         cursor.execute("SELECT tasa FROM configuracion WHERE id = 1")
         row = cursor.fetchone()
-        if row and row[0]:
+        if row and row[0] is not None:
             tasa_actual = float(row[0])
         conn.close()
     except Exception as e:
@@ -197,7 +191,6 @@ def buscar_cliente(cedula):
             conn.close()
         return jsonify({"existe": False, "error": str(e)})
 
-
 # =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
@@ -224,7 +217,7 @@ def precios():
 
         return redirect(url_for('precios'))
 
-    tasa_actual = 74.20
+    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
     try:
         conn = sqlite3.connect("estebita.db", timeout=10)
         cursor = conn.cursor()
@@ -246,7 +239,6 @@ def precios():
 
     return render_template('precios.html', precios_usd=precios_usd, tasa_cambio=tasa_actual)
 
-
 # =========================================================
 # 5. WHATSAPP / NOTIFICACIONES
 # =========================================================
@@ -266,7 +258,7 @@ def whatsapp():
                 c.nombre,
                 c.telefono
             FROM pedidos p
-          LEFT JOIN clientes c ON CAST(p.cedula_cliente AS TEXT) = CAST(c.cedula AS TEXT)
+            LEFT JOIN clientes c ON CAST(p.cedula_cliente AS TEXT) = CAST(c.cedula AS TEXT)
             WHERE DATE(p.fecha) = ? AND (p.estado IS NULL OR p.estado != 'Cancelado')
         """, (ayer,))
         pedidos_raw = cursor.fetchall()
@@ -305,8 +297,6 @@ def whatsapp():
 
     return render_template("whatsapp.html", pedidos=pedidos_procesados, fecha_ayer=ayer)
 
-
-# =========================================================
 # =========================================================
 # 6. REPORTES DIARIOS
 # =========================================================
@@ -320,7 +310,6 @@ def reporte_diario():
     cursor = conn.cursor()
 
     try:
-        # Agrupa pedidos por tamaño de cilindro
         cursor.execute("""
             SELECT 
                 tamano_cilindro AS tamano,
@@ -338,7 +327,6 @@ def reporte_diario():
         total_cilindros = sum(f["cilindros"] for f in resumen) if resumen else 0
         total_monto = sum(f["subtotal"] for f in resumen) if resumen else 0
 
-        # Conteo de clientes únicos usando cedula_cliente
         cursor.execute(
             "SELECT COUNT(DISTINCT cedula_cliente) FROM pedidos WHERE DATE(fecha) = ? AND (estado IS NULL OR estado != 'Cancelado')",
             (fecha,),
@@ -361,16 +349,22 @@ def reporte_diario():
         total_monto=total_monto,
         total_clientes=total_clientes,
     )
-# GESTIÓN DE PEDIDOS / LOGÍSTICA
+
+# =========================================================
+# 7. GESTIÓN DE PEDIDOS / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
 def seguimiento_pedidos():
+    fecha_actual = request.args.get("fecha", date.today().strftime("%Y-%m-%d"))
+    busqueda = request.args.get("busqueda", "")
+    ref_punto = request.args.get("ref_punto", "")
+    estado = request.args.get("estado", "")
+
     conn = sqlite3.connect("estebita.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     try:
-        # Consulta limpia apuntando a c.cedula (sin c.id)
         query = """
             SELECT 
                 p.*, 
@@ -383,8 +377,6 @@ def seguimiento_pedidos():
         """
         cursor.execute(query)
         pedidos_raw = cursor.fetchall()
-
-        # Convertir a formato dict para manejar fácilmente
         pedidos = [dict(row) for row in pedidos_raw]
 
     except Exception as e:
@@ -393,8 +385,16 @@ def seguimiento_pedidos():
     finally:
         conn.close()
 
-    return render_template("seguimiento_pedidos.html", pedidos=pedidos)
-# ====================================================
+    return render_template(
+        "seguimiento_pedidos.html", 
+        pedidos=pedidos,
+        fecha_actual=fecha_actual,
+        busqueda=busqueda,
+        ref_punto=ref_punto,
+        estado_filtro=estado
+    )
+
+# =========================================================
 # ARRANQUE DEL SERVIDOR
 # =========================================================
 import os

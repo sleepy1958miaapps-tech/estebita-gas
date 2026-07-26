@@ -3,6 +3,7 @@
 {% block content %}
 <!-- Guardamos la tasa recibida de app.py para que JS la lea -->
 <input type="hidden" id="tasa_cambio" value="{{ tasa_dolar }}">
+
 <div class="container mt-3" style="max-width: 500px;">
     <h3 class="text-center mb-3">📦 Registrar Nuevo Pedido</h3>
 
@@ -42,16 +43,13 @@
             <div id="contenedor-tickets" class="d-flex flex-column gap-2"></div>
         </div>
 
-       <!-- Guardamos la tasa que viene de app.py -->
-<input type="hidden" id="tasa_cambio" value="{{ tasa_dolar }}">
-
-<div class="mb-3">
-    <label class="form-label fw-bold">Monto Total a Cobrar (Bs):</label>
-    <div class="input-group">
-        <span class="input-group-text bg-success text-white fw-bold">Bs.</span>
-        <input type="text" id="monto_bs" class="form-control fw-bold text-success fs-5" readonly placeholder="0.00">
-    </div>
-</div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Monto Total a Cobrar (Bs):</label>
+            <div class="input-group">
+                <span class="input-group-text bg-success text-white fw-bold">Bs.</span>
+                <input type="text" id="monto_bs" class="form-control fw-bold text-success fs-5" readonly placeholder="0.00">
+            </div>
+        </div>
 
         <button type="button" class="btn btn-success w-100" onclick="validarYPasarAPago()">Continuar al Pago ➔</button>
     </div>
@@ -86,12 +84,10 @@
     </div>
 </div>
 
-
 <script>
 let clienteSeleccionadoId = null;
 let metodoPagoSeleccionado = '';
 
-// Precios unitarios en USD
 const PRECIOS = {
     '10kg': 4,
     '18kg': 10,
@@ -188,30 +184,34 @@ function generarCamposTickets() {
         `;
     }
     
-    // Recalcula el monto inmediatamente al cambiar cantidades de bombonas
     calcularMonto();
 }
 
-// Nueva función que calcula automáticamente el monto en USD y Bs
-// BORRA ESTO:
 function calcularMonto() {
     const cant = parseInt(document.getElementById('cantidad_bombonas')?.value) || 0;
     const tamano = document.getElementById('tamano_cilindro')?.value || '10kg';
     
-    // Precio base en USD
     const precioUnitarioUSD = PRECIOS[tamano] || 0;
     const totalUSD = cant * precioUnitarioUSD;
 
-    // Leemos la tasa que pasó Flask desde estebita.db
     const tasaElem = document.getElementById('tasa_cambio');
-    const tasa = parseFloat(tasaElem?.value) || 0;
+    const rawTasa = tasaElem?.value ? tasaElem.value.trim() : "";
 
-    // Calculamos estrictamente en Bolívares
+    const inputMonto = document.getElementById('monto_bs');
+
+    if (!rawTasa || parseFloat(rawTasa) <= 0 || isNaN(parseFloat(rawTasa))) {
+        if (inputMonto) {
+            inputMonto.value = "Tasa no configurada";
+            inputMonto.classList.add("text-danger");
+        }
+        return;
+    }
+
+    const tasa = parseFloat(rawTasa);
     const totalBS = totalUSD * tasa;
 
-    // Asignamos el resultado redondeado a 2 decimales
-    const inputMonto = document.getElementById('monto_bs');
     if (inputMonto) {
+        inputMonto.classList.remove("text-danger");
         inputMonto.value = totalBS.toFixed(2);
     }
 }
@@ -251,12 +251,11 @@ function validarYPasarAPago() {
         return;
     }
 
-    // Validamos uno por uno que no estén vacíos
     inputsTickets.forEach((input) => {
         const val = input.value.trim();
         if (!val || val.length === 0) {
             todosValidos = false;
-            input.classList.add('is-invalid'); // Marca la casilla en rojo
+            input.classList.add('is-invalid');
         } else {
             input.classList.remove('is-invalid');
         }
@@ -267,21 +266,17 @@ function validarYPasarAPago() {
         return;
     }
 
-    // Validamos el monto
     const inputMonto = document.getElementById('monto_bs');
     const monto = parseFloat(inputMonto ? inputMonto.value : 0);
 
     if (isNaN(monto) || monto <= 0) {
-        alert("⚠️ Por favor asegúrese de que el monto total a cobrar sea mayor a 0.");
+        alert("⚠️ Por favor configure primero la tasa de cambio antes de registrar la venta.");
         return;
     }
 
-    // Si todo está correcto, desbloqueamos la sección de pago
     const pasoPago = document.getElementById('paso-pago');
     pasoPago.classList.remove('opacity-50');
     pasoPago.style.pointerEvents = 'auto';
-    
-    // Hacemos scroll suave hacia las formas de pago
     pasoPago.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -327,7 +322,7 @@ function confirmarVenta() {
     }
 
     alert(`✅ ¡Venta Registrada Exitosamente!\nOrigen: ${metodoPagoSeleccionado}\nTransacción procesada por Punto de Venta.`);
-    window.location.href = '/pedidos';
+    window.location.href = '/nuevo_pedido';
 }
 </script>
 {% endblock %}
