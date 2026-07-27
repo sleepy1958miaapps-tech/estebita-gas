@@ -1,11 +1,10 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from functools import wraps
 import sqlite3
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 
 app = Flask(__name__)
 app.secret_key = "estebita_gas_clave_super_secreta_2026"
-
 # =========================================================
 # 🔐 LISTA DE USUARIOS PERMITIDOS Y CONTRASEÑAS
 # =========================================================
@@ -122,32 +121,93 @@ def clientes():
 # =========================================================
 
 # =========================================================
-# 3. REGISTRAR PEDIDOS & BÚSQUEDA
-# =========================================================
-@app.route('/registrar_cliente', methods=['POST'])
-def registrar_cliente():
-    cedula = request.form.get('cedula')
-    nombre = request.form.get('nombre')
-    apellido = request.form.get('apellido')
-    telefono = request.form.get('telefono')
-    direccion = request.form.get('direccion')
-
-    conn = sqlite3.connect('estebita.db')
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion) 
-        VALUES (?, ?, ?, ?, ?)
-    """, (cedula, nombre, apellido, telefono, direccion))
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for('nuevo_pedido'))
-
-@app.route("/nuevo_pedido")
-def nuevo_pedido():
-    tasa_actual = ""
+#@app.route('/guardar_pedido', methods=['POST'])
+def guardar_pedido():
     try:
-        conn = sqlite3.connect("estebita.db")
+        data = request.get_json()
+
+        cedula = data.get('cedula_cliente')
+        nombre = data.get('nombre', '').strip()
+        apellido = data.get('apellido', '').strip()
+        telefono = data.get('telefono', '').strip()
+        direccion = data.get('direccion', '').strip()
+
+        tamano = data.get('tamano_cilindro')
+        cantidad = data.get('cantidad_bombonas')
+        monto_bs = data.get('monto_bs')
+        tickets = data.get('tickets')
+        metodo_pago = data.get('metodo_pago')
+        referencia = data.get('referencia')
+
+        if not cedula:
+            return jsonify({'status': 'error', 'message': 'La cédula del cliente es obligatoria.'})
+
+        conn = sqlite3.connect('estebita.db')
+        cursor = conn.cursor()
+
+        # 1. Verificar o crear cliente automáticamente
+        cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
+        cliente = cursor.fetchone()
+
+        if cliente:
+            cliente_id = cliente[0]
+        else:
+            if not nombre or not apellido:
+                conn.close()
+                return jsonify({'status': 'error', 'message': 'Nombre y Apellido son obligatorios para cliente nuevo.'})
+
+            cursor.execute("""
+                INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion)
+                VALUES (?, ?, ?, ?, ?)
+            """, (cedula, nombre, apellido, telefono, direccion))
+            cliente_id = cursor.lastrowid
+
+        # 2. Registrar el Pedido / Venta
+        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute("""
+            INSERT INTO pedidos (cliente_id, tamano_cilindro, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha, estado)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Entregado')
+        """, (cliente_id, tamano, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha_actual))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'status': 'success', 'message': 'Venta registrada correctamente.'})
+
+    except Exception as e:
+        print(f"Error al guardar pedido: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# =========================================================
+# 4. PRECIOS & TASA
+# =========================================================
+@app.route('/precios', methods=['GET', 'POST'])
+def precios():
+    if request.method == 'POST':
+        nueva_tasa = request.form.get('tasa_cambio')
+        if nueva_tasa:
+            try:
+                texto_limpio = str(nueva_tasa).replace(',', '.').strip()
+                valor_tasa = float(texto_limpio)
+
+                conn = sqlite3.connect("estebita.db", timeout=10)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO configuracion (id, tasa) 
+                    VALUES (1, ?)
+                """, (valor_tasa,))
+                conn.commit()
+                conn.close()
+                print(f"--> ¡GUARDADO EXITOSO EN SQLITE: {valor_tasa} Bs.!")
+            except Exception as e:
+                print(f"--> ERROR GUARDANDO EN BD: {e}")
+
+        return redirect(url_for('precios'))
+
+    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
+    try:
+        conn = sqlite3.connect("estebita.db", timeout=10)
         cursor = conn.cursor()
         cursor.execute("SELECT tasa FROM configuracion WHERE id = 1")
         row = cursor.fetchone()
@@ -155,94 +215,17 @@ def nuevo_pedido():
             tasa_actual = float(row[0])
         conn.close()
     except Exception as e:
-        print(f"Error en SQLite Pedidos: {e}")
+        print(f"--> ERROR LEYENDO BD: {e}")
 
-    return render_template("pedidos.html", tasa_dolar=tasa_actual)
+    precios_usd = {
+        '10kg': 4.0,
+        '18kg': 10.0,
+        '21kg': 13.0,
+        '28kg': 15.0,
+        '43kg': 20.0
+    }
 
-@app.route("/buscar_cliente/<cedula>")
-def buscar_cliente(cedula):
-    conn = sqlite3.connect("estebita.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cedula_limpia = "".join(filter(str.isdigit, str(cedula)))
-
-    try:
-        cursor.execute("SELECT * FROM clientes WHERE cedula = ?", (cedula_limpia,))
-        cliente = cursor.fetchone()
-        conn.close()
-
-        if cliente:
-            c_dict = dict(cliente)
-            raw_tlf = "".join(filter(str.isdigit, str(c_dict.get("telefono", ""))))
-            if raw_tlf.startswith("58"):
-                raw_tlf = raw_tlf[2:]
-            if raw_tlf.startswith("0"):
-                raw_tlf = raw_tlf[1:]
-            
-            telefono_formateado = f"+58{raw_tlf}" if raw_tlf else ""
-
-            return jsonify({
-                "existe": True,
-                "cedula": c_dict.get("cedula", ""),
-                "nombre": c_dict.get("nombre", ""),
-                "apellido": c_dict.get("apellido", ""),
-                "telefono": telefono_formateado,
-                "direccion": c_dict.get("direccion", "No registrada"),
-            })
-        else:
-            return jsonify({"existe": False})
-
-    except Exception as e:
-        print("Error en búsqueda de cliente:", e)
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"existe": False, "error": str(e)})
-
-# --- AQUÍ ESTABA EL FALTANTE CRÍTICO ---
-@app.route('/guardar_pedido', methods=['POST'])
-def guardar_pedido():
-    try:
-        # 1. Obtenemos todos los datos del formulario
-        cedula = request.form.get('cedula')
-        nombre = request.form.get('nombre')
-        apellido = request.form.get('apellido')
-        telefono = request.form.get('telefono')
-        direccion = request.form.get('direccion')
-        
-        cilindro = request.form.get('cilindro')
-        monto = request.form.get('monto')
-        metodo_pago = request.form.get('metodo_pago')
-
-        conn = sqlite3.connect('estebita.db')
-        cursor = conn.cursor()
-
-        # 2. Verificamos si el cliente ya existe en la BD
-        cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
-        cliente_existente = cursor.fetchone()
-
-        # 3. Si no existe y nos enviaron datos, lo registramos de una vez
-        if not cliente_existente and nombre:
-            cursor.execute("""
-                INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion) 
-                VALUES (?, ?, ?, ?, ?)
-            """, (cedula, nombre, apellido, telefono, direccion))
-
-        # 4. Registramos la venta/pedido
-        cursor.execute("""
-            INSERT INTO pedidos (cedula_cliente, cilindro, monto, metodo_pago, estado) 
-            VALUES (?, ?, ?, ?, 'Procesado')
-        """, (cedula, cilindro, monto, metodo_pago))
-        
-        conn.commit()
-        conn.close()
-
-        # Volvemos a la pantalla de pedido limpia para el siguiente cliente
-        return redirect(url_for('nuevo_pedido'))
-
-    except Exception as e:
-        print(f"Error al guardar pedido: {e}")
-        return f"Error interno: {e}", 500
+    return render_template('precios.html', precios_usd=precios_usd, tasa_cambio=tasa_actual)
 # =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
