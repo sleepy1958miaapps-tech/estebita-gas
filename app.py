@@ -138,69 +138,24 @@ def buscar_cliente(cedula):
     return jsonify({'encontrado': False})
 
 # =========================================================
+## =========================================================
 # 3. REGISTRO DE PEDIDOS
 # =========================================================
 @app.route('/nuevo_pedido')
 def nuevo_pedido():
-    return render_template('pedidos.html')
-
-@app.route('/guardar_pedido', methods=['POST'])
-def guardar_pedido():
+    tasa_actual = None
     try:
-        data = request.get_json()
-
-        cedula = data.get('cedula_cliente')
-        nombre = data.get('nombre', '').strip()
-        apellido = data.get('apellido', '').strip()
-        telefono = data.get('telefono', '').strip()
-        direccion = data.get('direccion', '').strip()
-
-        tamano = data.get('tamano_cilindro')
-        cantidad = data.get('cantidad_bombonas')
-        monto_bs = data.get('monto_bs')
-        tickets = data.get('tickets')
-        metodo_pago = data.get('metodo_pago')
-        referencia = data.get('referencia')
-
-        if not cedula:
-            return jsonify({'status': 'error', 'message': 'La cédula del cliente es obligatoria.'})
-
-        conn = sqlite3.connect('estebita.db')
+        conn = sqlite3.connect("estebita.db", timeout=10)
         cursor = conn.cursor()
-
-        # 1. Verificar o crear cliente automáticamente
-        cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
-        cliente = cursor.fetchone()
-
-        if cliente:
-            cliente_id = cliente[0]
-        else:
-            if not nombre or not apellido:
-                conn.close()
-                return jsonify({'status': 'error', 'message': 'Nombre y Apellido son obligatorios para cliente nuevo.'})
-
-            cursor.execute("""
-                INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion)
-                VALUES (?, ?, ?, ?, ?)
-            """, (cedula, nombre, apellido, telefono, direccion))
-            cliente_id = cursor.lastrowid
-
-        # 2. Registrar el Pedido / Venta
-        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        cursor.execute("""
-            INSERT INTO pedidos (cliente_id, cedula_cliente, tamano_cilindro, cantidad_bombonas, monto_bs, tickets, metodo_pago, referencia, fecha, estado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Entregado')
-        """, (cliente_id, cedula, tamano, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha_actual))
-
-        conn.commit()
+        cursor.execute("SELECT tasa FROM configuracion WHERE id = 1")
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            tasa_actual = float(row[0])
         conn.close()
-
-        return jsonify({'status': 'success', 'message': 'Venta registrada correctamente.'})
-
     except Exception as e:
-        print(f"Error al guardar pedido: {e}")
-        return jsonify({'status': 'error', 'message': str(e)})
+        print(f"Error al leer la tasa de cambio: {e}")
+
+    return render_template('pedidos.html', tasa_cambio=tasa_actual)
 
 # =========================================================
 # 4. PRECIOS & TASA
