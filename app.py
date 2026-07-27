@@ -354,8 +354,8 @@ def reporte_diario():
 ## =========================================================
 # 7. GESTIÓN DE PEDIDOS / LOGÍSTICA
 # =========================================================
-@app.route('/seguimiento_de_pedidos')
-def seguimiento_de_pedidos():
+@app.route('/seguimiento_pedidos')
+def seguimiento_pedidos():
     fecha_actual = request.args.get("fecha", "")
     busqueda = request.args.get("busqueda", "").strip()
     ref_punto = request.args.get("ref_punto", "").strip()
@@ -410,7 +410,7 @@ def seguimiento_de_pedidos():
         conn.close()
 
     return render_template(
-        "seguimiento_de_pedidos.html", 
+        "seguimiento_pedidos.html", 
         pedidos=pedidos,
         fecha_actual=fecha_actual,
         busqueda=busqueda,
