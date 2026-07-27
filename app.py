@@ -180,6 +180,7 @@ def guardar_pedido():
         return jsonify({'status': 'error', 'message': str(e)})
 
 # =========================================================
+## =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
 @app.route('/precios', methods=['GET', 'POST'])
@@ -226,54 +227,6 @@ def precios():
     }
 
     return render_template('precios.html', precios_usd=precios_usd, tasa_cambio=tasa_actual)
-# =========================================================
-# 4. PRECIOS & TASA
-# =========================================================
-@app.route('/precios', methods=['GET', 'POST'])
-def precios():
-    if request.method == 'POST':
-        nueva_tasa = request.form.get('tasa_cambio')
-        if nueva_tasa:
-            try:
-                texto_limpio = str(nueva_tasa).replace(',', '.').strip()
-                valor_tasa = float(texto_limpio)
-
-                conn = sqlite3.connect("estebita.db", timeout=10)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT OR REPLACE INTO configuracion (id, tasa) 
-                    VALUES (1, ?)
-                """, (valor_tasa,))
-                conn.commit()
-                conn.close()
-                print(f"--> ¡GUARDADO EXITOSO EN SQLITE: {valor_tasa} Bs.!")
-            except Exception as e:
-                print(f"--> ERROR GUARDANDO EN BD: {e}")
-
-        return redirect(url_for('precios'))
-
-    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
-    try:
-        conn = sqlite3.connect("estebita.db", timeout=10)
-        cursor = conn.cursor()
-        cursor.execute("SELECT tasa FROM configuracion WHERE id = 1")
-        row = cursor.fetchone()
-        if row and row[0] is not None:
-            tasa_actual = float(row[0])
-        conn.close()
-    except Exception as e:
-        print(f"--> ERROR LEYENDO BD: {e}")
-
-    precios_usd = {
-        '10kg': 4.0,
-        '18kg': 10.0,
-        '21kg': 13.0,
-        '28kg': 15.0,
-        '43kg': 20.0
-    }
-
-    return render_template('precios.html', precios_usd=precios_usd, tasa_cambio=tasa_actual)
-
 # =========================================================
 # 5. WHATSAPP / NOTIFICACIONES
 # =========================================================
