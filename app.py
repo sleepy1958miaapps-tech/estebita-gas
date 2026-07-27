@@ -2,9 +2,11 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from functools import wraps
 import sqlite3
 from datetime import datetime, date, timedelta
+import os
 
 app = Flask(__name__)
 app.secret_key = "estebita_gas_clave_super_secreta_2026"
+
 # =========================================================
 # 🔐 LISTA DE USUARIOS PERMITIDOS Y CONTRASEÑAS
 # =========================================================
@@ -116,12 +118,33 @@ def clientes():
     conn.close()
     return render_template('clientes.html', clientes=lista_clientes)
 
-
+@app.route('/buscar_cliente/<cedula>')
+def buscar_cliente(cedula):
+    conn = sqlite3.connect('estebita.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM clientes WHERE cedula = ?", (cedula,))
+    cliente = cursor.fetchone()
+    conn.close()
+    
+    if cliente:
+        return jsonify({
+            'encontrado': True,
+            'nombre': cliente['nombre'],
+            'apellido': cliente['apellido'],
+            'telefono': cliente['telefono'],
+            'direccion': cliente['direccion']
+        })
+    return jsonify({'encontrado': False})
 
 # =========================================================
-
+# 3. REGISTRO DE PEDIDOS
 # =========================================================
-#@app.route('/guardar_pedido', methods=['POST'])
+@app.route('/nuevo_pedido')
+def nuevo_pedido():
+    return render_template('pedidos.html')
+
+@app.route('/guardar_pedido', methods=['POST'])
 def guardar_pedido():
     try:
         data = request.get_json()
@@ -166,9 +189,9 @@ def guardar_pedido():
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cursor.execute("""
-            INSERT INTO pedidos (cliente_id, tamano_cilindro, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha, estado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Entregado')
-        """, (cliente_id, tamano, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha_actual))
+            INSERT INTO pedidos (cliente_id, cedula_cliente, tamano_cilindro, cantidad_bombonas, monto_bs, tickets, metodo_pago, referencia, fecha, estado)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Entregado')
+        """, (cliente_id, cedula, tamano, cantidad, monto_bs, tickets, metodo_pago, referencia, fecha_actual))
 
         conn.commit()
         conn.close()
@@ -180,7 +203,6 @@ def guardar_pedido():
         return jsonify({'status': 'error', 'message': str(e)})
 
 # =========================================================
-## =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
 @app.route('/precios', methods=['GET', 'POST'])
@@ -227,6 +249,7 @@ def precios():
     }
 
     return render_template('precios.html', precios_usd=precios_usd, tasa_cambio=tasa_actual)
+
 # =========================================================
 # 5. WHATSAPP / NOTIFICACIONES
 # =========================================================
@@ -339,7 +362,6 @@ def reporte_diario():
     )
 
 # =========================================================
-## =========================================================
 # 7. GESTIÓN DE PEDIDOS / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
@@ -354,7 +376,6 @@ def seguimiento_pedidos():
     cursor = conn.cursor()
 
     try:
-        # Consulta base
         query = """
             SELECT 
                 p.*, 
@@ -367,7 +388,6 @@ def seguimiento_pedidos():
         """
         params = []
 
-        # Aplicar filtros dinámicos si el usuario los envía
         if fecha_actual:
             query += " AND DATE(p.fecha) = ?"
             params.append(fecha_actual)
@@ -406,7 +426,6 @@ def seguimiento_pedidos():
         estado_filtro=estado
     )
 
-
 @app.route('/actualizar_estado_pedidos', methods=['POST'])
 def actualizar_estado_pedidos():
     try:
@@ -431,6 +450,7 @@ def actualizar_estado_pedidos():
     except Exception as e:
         print("Error al actualizar estados:", e)
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # =========================================================
 # RUTA TEMPORAL REPARAR USUARIO
 # =========================================================
@@ -456,11 +476,10 @@ def crear_admin_urgente():
         return "<h1>✅ Usuario 'admin' creado con contraseña 'admin123' exitosamente!</h1>"
     except Exception as e:
         return f"<h1>❌ Error al crear usuario: {e}</h1>"
+
 # =========================================================
 # ARRANQUE DEL SERVIDOR
 # =========================================================
-import os
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
