@@ -443,7 +443,31 @@ def actualizar_estado_pedidos():
     except Exception as e:
         print("Error al actualizar estados:", e)
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
+# =========================================================
+# RUTA TEMPORAL REPARAR USUARIO
+# =========================================================
+@app.route('/crear_admin_urgente')
+def crear_admin_urgente():
+    try:
+        conn = sqlite3.connect("estebita.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                rol TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            INSERT OR REPLACE INTO usuarios (id, username, password, rol)
+            VALUES (1, 'admin', 'admin123', 'admin')
+        ''')
+        conn.commit()
+        conn.close()
+        return "<h1>✅ Usuario 'admin' creado con contraseña 'admin123' exitosamente!</h1>"
+    except Exception as e:
+        return f"<h1>❌ Error al crear usuario: {e}</h1>"
 # =========================================================
 # ARRANQUE DEL SERVIDOR
 # =========================================================
