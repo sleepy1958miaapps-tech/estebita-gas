@@ -126,18 +126,19 @@ function buscarCliente() {
                     </div>
                 `;
                 desbloquearPasoBombonas();
-            } else {
+           } else {
                 clienteSeleccionadoId = null;
                 divRes.innerHTML = `
-                    <div class="alert alert-danger m-0 text-center">
-                        <strong>El cliente no existe.</strong><br>
+                    <div class="alert alert-warning m-0 text-center">
+                        <strong>Cliente no registrado.</strong> Ingresa sus datos abajo para registrarlo y vender de una vez.<br>
                         <div class="d-flex gap-2 justify-content-center mt-2">
-                            <a href="/clientes" class="btn btn-sm btn-danger">Crear Cliente</a>
-                            <button class="btn btn-sm btn-secondary" onclick="limpiarBusqueda()">Volver</button>
+                            <button type="button" class="btn btn-sm btn-success" onclick="habilitarCamposNuevoCliente()">Llenar datos del cliente</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="limpiarBusqueda()">Limpiar</button>
                         </div>
                     </div>
                 `;
-                bloquearPasoBombonas();
+                // Desbloqueamos los campos o el paso de bombonas para permitir la venta directa
+                desbloquearPasoBombonas();
             }
         });
 }
@@ -347,5 +348,19 @@ function confirmarVenta() {
     })
     .catch(err => alert("Error de conexión al guardar el pedido."));
 }
+function habilitarCamposNuevoCliente() {
+    // Busca los campos del cliente para mostrarlos si estaban ocultos
+    let contenedorCampos = document.getElementById('seccion-cliente');
+    if (contenedorCampos) {
+        contenedorCampos.style.display = 'block';
+    }
+    
+    // Habilita los campos para escribir y los limpia
+    document.querySelectorAll('#seccion-cliente input').forEach(input => {
+        input.removeAttribute('disabled');
+        input.value = '';
+    });
+}
+
 </script>
 {% endblock %}
