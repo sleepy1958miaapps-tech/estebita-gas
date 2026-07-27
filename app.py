@@ -161,7 +161,47 @@ def nuevo_pedido():
 
     # Enviamos ambas variables por compatibilidad con cualquier parte de la plantilla
     return render_template('pedidos.html', tasa_cambio=tasa_actual, tasa_dolar=tasa_actual)
+# =========================================================
+# =========================================================
+# 3.1 PROCESAR Y GUARDAR/CONFIRMAR PEDIDO
+# =========================================================
+@app.route('/guardar_pedido', methods=['POST'])
+@app.route('/confirmar_pedido', methods=['POST'])
+def procesar_pedido():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'status': 'error', 'message': 'No se recibieron datos'}), 400
 
+        conn = sqlite3.connect("estebita.db", timeout=10)
+        cursor = conn.cursor()
+
+        # Extraer campos adaptados a cualquier formato enviado por el JavaScript
+        cedula = data.get('cedula_cliente') or data.get('cedula')
+        tamano = data.get('tamano_cilindro') or data.get('tamano')
+        cantidad = data.get('cantidad_bombonas') or data.get('cantidad', 1)
+        monto_bs = data.get('monto_bs') or data.get('monto', 0.0)
+        metodo = data.get('metodo_pago') or data.get('metodo')
+        referencia = data.get('referencia', '')
+        tickets = data.get('tickets', '')
+        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute("""
+            INSERT INTO pedidos (
+                cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
+                monto_bs, fecha, estado, tickets, metodo_pago, referencia
+            ) VALUES (?, ?, ?, ?, ?, ?, 'Recibido', ?, ?, ?)
+        """, (cedula, tamano, cantidad, cantidad, monto_bs, fecha_actual, tickets, metodo, referencia))
+
+        conn.commit()
+        conn.close()
+
+        print("--> ¡PEDIDO CONFIRMADO Y GUARDADO EN SQLITE!")
+        return jsonify({'success': True, 'status': 'success', 'message': 'Pedido confirmado con éxito'})
+
+    except Exception as e:
+        print(f"--> ERROR AL CONFIRMAR PEDIDO: {e}")
+        return jsonify({'success': False, 'status': 'error', 'message': str(e)}), 500
 # =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
