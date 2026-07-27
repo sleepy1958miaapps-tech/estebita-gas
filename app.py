@@ -117,27 +117,35 @@ def clientes():
     conn.close()
     return render_template('clientes.html', clientes=lista_clientes)
 
+
+
+# =========================================================
+
+# =========================================================
+# 3. REGISTRAR PEDIDOS & BÚSQUEDA
+# =========================================================
 @app.route('/registrar_cliente', methods=['POST'])
 def registrar_cliente():
+    cedula = request.form.get('cedula')
     nombre = request.form.get('nombre')
+    apellido = request.form.get('apellido')
     telefono = request.form.get('telefono')
     direccion = request.form.get('direccion')
 
     conn = sqlite3.connect('estebita.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO clientes (nombre, telefono, direccion) VALUES (?, ?, ?)", 
-                   (nombre, telefono, direccion))
+    cursor.execute("""
+        INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion) 
+        VALUES (?, ?, ?, ?, ?)
+    """, (cedula, nombre, apellido, telefono, direccion))
     conn.commit()
     conn.close()
 
-    return redirect(url_for('clientes'))
+    return redirect(url_for('nuevo_pedido'))
 
-# =========================================================
-# 3. REGISTRAR PEDIDOS & BÚSQUEDA
-# =========================================================
 @app.route("/nuevo_pedido")
 def nuevo_pedido():
-    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
+    tasa_actual = ""
     try:
         conn = sqlite3.connect("estebita.db")
         cursor = conn.cursor()
@@ -191,6 +199,50 @@ def buscar_cliente(cedula):
             conn.close()
         return jsonify({"existe": False, "error": str(e)})
 
+# --- AQUÍ ESTABA EL FALTANTE CRÍTICO ---
+@app.route('/guardar_pedido', methods=['POST'])
+def guardar_pedido():
+    try:
+        # 1. Obtenemos todos los datos del formulario
+        cedula = request.form.get('cedula')
+        nombre = request.form.get('nombre')
+        apellido = request.form.get('apellido')
+        telefono = request.form.get('telefono')
+        direccion = request.form.get('direccion')
+        
+        cilindro = request.form.get('cilindro')
+        monto = request.form.get('monto')
+        metodo_pago = request.form.get('metodo_pago')
+
+        conn = sqlite3.connect('estebita.db')
+        cursor = conn.cursor()
+
+        # 2. Verificamos si el cliente ya existe en la BD
+        cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
+        cliente_existente = cursor.fetchone()
+
+        # 3. Si no existe y nos enviaron datos, lo registramos de una vez
+        if not cliente_existente and nombre:
+            cursor.execute("""
+                INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion) 
+                VALUES (?, ?, ?, ?, ?)
+            """, (cedula, nombre, apellido, telefono, direccion))
+
+        # 4. Registramos la venta/pedido
+        cursor.execute("""
+            INSERT INTO pedidos (cedula_cliente, cilindro, monto, metodo_pago, estado) 
+            VALUES (?, ?, ?, ?, 'Procesado')
+        """, (cedula, cilindro, monto, metodo_pago))
+        
+        conn.commit()
+        conn.close()
+
+        # Volvemos a la pantalla de pedido limpia para el siguiente cliente
+        return redirect(url_for('nuevo_pedido'))
+
+    except Exception as e:
+        print(f"Error al guardar pedido: {e}")
+        return f"Error interno: {e}", 500
 # =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
