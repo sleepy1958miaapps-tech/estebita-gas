@@ -35,7 +35,8 @@ def login():
 
         if usuario in USUARIOS and USUARIOS[usuario] == clave:
             session['usuario'] = usuario
-            return redirect(url_for('index'))
+            # REDIRECCIÓN AUTOMÁTICA A PRECIOS AL INICIAR SESIÓN
+            return redirect(url_for('precios'))
         else:
             error = "Usuario o contraseña incorrectos"
 
@@ -149,13 +150,17 @@ def nuevo_pedido():
         cursor = conn.cursor()
         cursor.execute("SELECT tasa FROM configuracion WHERE id = 1")
         row = cursor.fetchone()
-        if row and row[0] is not None:
+        if row and row[0] is not None and float(row[0]) > 0:
             tasa_actual = float(row[0])
+            print(f"--> TASA LEÍDA PARA NUEVO PEDIDO: {tasa_actual} Bs.")
+        else:
+            print("--> LA TASA EN BD ESTÁ VACÍA O ES CERO")
         conn.close()
     except Exception as e:
-        print(f"Error al leer la tasa de cambio: {e}")
+        print(f"--> ERROR AL LEER TASA: {e}")
 
-    return render_template('pedidos.html', tasa_cambio=tasa_actual)
+    # Enviamos ambas variables por compatibilidad con cualquier parte de la plantilla
+    return render_template('pedidos.html', tasa_cambio=tasa_actual, tasa_dolar=tasa_actual)
 
 # =========================================================
 # 4. PRECIOS & TASA

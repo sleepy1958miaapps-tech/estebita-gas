@@ -1,11 +1,24 @@
 {% extends "base.html" %}
 
 {% block content %}
-<input type="hidden" id="tasa_cambio" value="{{ tasa_dolar }}">
+<!-- 1. CORREGIDO: Usamos la variable {{ tasa_cambio }} que viene de app.py -->
+<input type="hidden" id="tasa_cambio" value="{{ tasa_cambio }}">
 
 <div class="container mt-3" style="max-width: 500px;">
-    <h3 class="text-center mb-3"><i class="fa-solid fa-cart-plus text-primary me-2"></i> Registrar Nuevo Pedido</h3>
+    <h3 class="text-center mb-1"><i class="fa-solid fa-cart-plus text-primary me-2"></i> Registrar Nuevo Pedido</h3>
 
+    <!-- 2. AQUÍ COLOCAMOS EL CARTEL DE LA TASA (Debajo del título) -->
+    <div class="text-center mb-3">
+      {% if tasa_cambio %}
+        <span class="badge bg-success fs-6"><i class="fa-solid fa-coins me-1"></i> Tasa Oficial: {{ tasa_cambio }} Bs.</span>
+      {% else %}
+        <span class="badge bg-danger fs-6"><i class="fa-solid fa-triangle-exclamation me-1"></i> Tasa no configurada</span>
+      {% endif %}
+    </div>
+
+    <!-- PASO 1: CÉDULA / CLIENTE -->
+    <div class="card p-3 shadow-sm mb-3" id="paso-cliente">
+    ...
     <!-- PASO 1: CÉDULA / CLIENTE -->
     <div class="card p-3 shadow-sm mb-3" id="paso-cliente">
         <h5 class="card-title mb-3">1. Identificación del Cliente</h5>
