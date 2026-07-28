@@ -426,9 +426,11 @@ def seguimiento_pedidos():
         """
         params = []
 
-        if fecha_filtro_db:
-            query += " AND DATE(p.fecha) = ?"
-            params.append(fecha_filtro_db)
+        # Reemplaza desde "fecha_filtro_db = ''" hasta el "if fecha_filtro_db:" por esto:
+    if fecha_input:
+        # Busca coincidencia directa (por si la fecha viene en DD/MM/YYYY o YYYY-MM-DD)
+        query += " AND (p.fecha LIKE ? OR DATE(p.fecha) = ?)"
+        params.extend([f"%{fecha_input}%", fecha_filtro_db])
 
         if busqueda:
             query += " AND (p.cedula_cliente LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ?)"
