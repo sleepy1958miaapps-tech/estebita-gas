@@ -10,7 +10,7 @@ def inicializar_base_datos():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Crear tabla clientes
+    # Tabla Clientes
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
             cedula TEXT PRIMARY KEY,
@@ -21,7 +21,7 @@ def inicializar_base_datos():
         )
     """)
     
-    # Crear tabla pedidos
+    # Tabla Pedidos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,28 +38,73 @@ def inicializar_base_datos():
         )
     """)
     
-    # Crear tabla precios si no existe
+    # Tabla Precios / Configuración
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS precios (
             tamano TEXT PRIMARY KEY,
             precio REAL
         )
     """)
+
+    # Tabla Config / Tasa
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS configuracion (
+            clave TEXT PRIMARY KEY,
+            valor TEXT
+        )
+    """)
+    
+    # Valor base por defecto si está recién instalada
+    cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('tasa_bcv', '36.50')")
+    cursor.execute("INSERT OR IGNORE INTO precios (tamano, precio) VALUES ('10kg', 100.0), ('18kg', 180.0), ('27kg', 270.0), ('43kg', 430.0)")
     
     conn.commit()
     conn.close()
 
-# Inicializar DB al arrancar la app
+# Inicializar DB siempre al arrancar
 inicializar_base_datos()
 
+def obtener_tasa_bcv():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT valor FROM configuracion WHERE clave = 'tasa_bcv'")
+        row = cursor.fetchone()
+        conn.close()
+        return float(row[0]) if row else 36.50
+    except Exception:
+        return 36.50
+
+# ☀️ FLUJO MATUTINO: Al iniciar la app, ir directo a la pantalla de Precios / Tasa
 @app.route('/')
 def index():
-    return redirect(url_for('nuevo_pedido'))
+    return redirect(url_for('precios'))
+
+@app.route('/precios', methods=['GET', 'POST'])
+def precios():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        # Captura la tasa ingresada en la mañana
+        tasa_nueva = request.form.get('tasa_bcv') or request.form.get('tasa')
+        if tasa_nueva:
+            tasa_limpia = str(tasa_nueva).replace(',', '.').strip()
+            cursor.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('tasa_bcv', ?)", (tasa_limpia,))
+            conn.commit()
+            conn.close()
+            # Una vez guardada la tasa, redirige automáticamente a la toma de pedidos
+            return redirect(url_for('nuevo_pedido'))
+
+    conn.close()
+    tasa = obtener_tasa_bcv()
+    return render_template('precios.html', tasa=tasa)
 
 @app.route('/nuevo_pedido')
+@app.route('/pedidos')
 def nuevo_pedido():
-    # ✅ AQUÍ APUNTAMOS A pedidos.html
-    return render_template('pedidos.html')
+    tasa = obtener_tasa_bcv()
+    return render_template('pedidos.html', tasa=tasa)
 
 @app.route('/buscar_cliente/<cedula>')
 def buscar_cliente(cedula):
@@ -104,11 +149,10 @@ def guardar_pedido():
         metodo_pago = str(data.get('metodo_pago', 'Efectivo')).strip()
         referencia = str(data.get('referencia', '')).strip()
         
-        # Fecha limpia YYYY-MM-DD
         fecha_actual = datetime.now().strftime("%Y-%m-%d")
         estado_inicial = "Por Entregar"
 
-        # 1. Guardar o Actualizar Cliente
+        # 1. Guardar/Actualizar Cliente
         if cedula:
             cursor.execute("""
                 INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion)
@@ -137,17 +181,18 @@ def guardar_pedido():
     except Exception as e:
         conn.rollback()
         print("❌ [GUARDAR_PEDIDO] Error:", str(e))
-        return jsonify({"status": "error", "message": f"Error: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Error servidor: {str(e)}"}), 500
     finally:
         conn.close()
 
 @app.route('/seguimiento_pedidos')
+@app.route('/seguimiento')
 def seguimiento_pedidos():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Arregla fechas previas que tenían hora
+    # Limpiar formato de fechas previas si tenían hora
     try:
         cursor.execute("UPDATE pedidos SET fecha = SUBSTR(fecha, 1, 10) WHERE LENGTH(fecha) > 10;")
         conn.commit()
@@ -194,15 +239,6 @@ def seguimiento_pedidos():
     conn.close()
     
     return render_template('seguimiento_pedidos.html', pedidos=pedidos)
-
-@app.route('/precios', methods=['GET', 'POST'])
-def precios():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    if request.method == 'POST':
-        pass
-    conn.close()
-    return render_template('precios.html')
 
 @app.route('/ver_base_datos')
 def ver_base_datos():
