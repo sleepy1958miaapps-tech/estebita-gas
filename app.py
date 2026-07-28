@@ -204,9 +204,21 @@ def procesar_pedido():
             INSERT INTO pedidos (
                 cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
                 monto_bs, fecha, estado, tickets, metodo_pago, referencia
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Recibido', ?, ?, ?)
-        """, (cedula, cedula, tamano, cantidad, cantidad, monto_bs, fecha_actual, tickets, metodo, referencia))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            cedula, 
+            tamano, 
+            cantidad, 
+            cantidad, 
+            monto_bs, 
+            fecha_actual, 
+            'Recibido', 
+            tickets, 
+            metodo, 
+            referencia
+        ))
 
+        conn.commit()
         conn.commit()
         conn.close()
 
