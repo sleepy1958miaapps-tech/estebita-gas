@@ -388,6 +388,8 @@ def reporte_diario():
     )
 
 # =========================================================
+## =========================================================
+## =========================================================
 # 7. Seguimiento Pedidos / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
@@ -397,21 +399,22 @@ def seguimiento_pedidos():
     ref_punto = request.args.get("ref_punto", "").strip()
     estado = request.args.get("estado", "").strip()
 
-    conn = sqlite3.connect("estebita.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    # Convertir fecha de entrada (DD/MM/YYYY o YYYY-MM-DD) al formato de la BD (YYYY-MM-DD)
+    # Preparamos la conversión de fecha antes de armar los parámetros
     fecha_filtro_db = ""
     if fecha_input:
         try:
             if "/" in fecha_input:
                 partes = fecha_input.split("/")
-                fecha_filtro_db = f"{partes[2]}-{partes[1]}-{partes[0]}"  # Convierte DD/MM/YYYY a YYYY-MM-DD
+                # Convierte DD/MM/YYYY a YYYY-MM-DD
+                fecha_filtro_db = f"{partes[2]}-{partes[1]}-{partes[0]}"
             else:
                 fecha_filtro_db = fecha_input
         except Exception:
             fecha_filtro_db = fecha_input
+
+    conn = sqlite3.connect("estebita.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
     try:
         query = """
@@ -426,11 +429,9 @@ def seguimiento_pedidos():
         """
         params = []
 
-        # Reemplaza desde "fecha_filtro_db = ''" hasta el "if fecha_filtro_db:" por esto:
-    if fecha_input:
-        # Busca coincidencia directa (por si la fecha viene en DD/MM/YYYY o YYYY-MM-DD)
-        query += " AND (p.fecha LIKE ? OR DATE(p.fecha) = ?)"
-        params.extend([f"%{fecha_input}%", fecha_filtro_db])
+        if fecha_input:
+            query += " AND (p.fecha LIKE ? OR DATE(p.fecha) = ?)"
+            params.extend([f"%{fecha_input}%", fecha_filtro_db])
 
         if busqueda:
             query += " AND (p.cedula_cliente LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ?)"
@@ -450,14 +451,13 @@ def seguimiento_pedidos():
         cursor.execute(query, params)
         pedidos_raw = cursor.fetchall()
         
-        # Formatear la fecha a DD/MM/YYYY para mostrarla en la pantalla
+        # Formatear la fecha a DD/MM/YYYY para la tabla en HTML
         pedidos = []
         for row in pedidos_raw:
             p = dict(row)
             if p.get("fecha"):
                 try:
-                    # Convierte "2026-07-27 14:30:00" -> "27/07/2026"
-                    fecha_obj = datetime.strptime(p["fecha"].split()[0], "%Y-%m-%d")
+                    fecha_obj = datetime.strptime(str(p["fecha"]).split()[0], "%Y-%m-%d")
                     p["fecha_formateada"] = fecha_obj.strftime("%d/%m/%Y")
                 except Exception:
                     p["fecha_formateada"] = p["fecha"]
@@ -479,6 +479,7 @@ def seguimiento_pedidos():
         ref_punto=ref_punto,
         estado_filtro=estado
     )
+    
 # =========================================================
 # RUTA TEMPORAL REPARAR USUARIO
 # =========================================================
