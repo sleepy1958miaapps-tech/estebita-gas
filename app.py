@@ -8,7 +8,6 @@ app = Flask(__name__)
 app.secret_key = "estebita_gas_clave_super_secreta_2026"
 
 # =========================================================
-# =========================================================
 # 🔐 LISTA DE USUARIOS PERMITIDOS Y CONTRASEÑAS
 # =========================================================
 USUARIOS = {
@@ -26,6 +25,7 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
@@ -35,7 +35,6 @@ def login():
 
         if usuario in USUARIOS and USUARIOS[usuario] == clave:
             session['usuario'] = usuario
-            # REDIRECCIÓN AUTOMÁTICA A PRECIOS AL INICIAR SESIÓN
             return redirect(url_for('precios'))
         else:
             error = "Usuario o contraseña incorrectos"
@@ -47,11 +46,14 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
-
+# =========================================================
+# ACTUALIZACIÓN SEGURA DE BASE DE DATOS
+# =========================================================
 def actualizar_base_datos():
     conn = sqlite3.connect("estebita.db")
     cursor = conn.cursor()
     
+    # 1. Tabla de Configuración
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS configuracion (
             id INTEGER PRIMARY KEY,
@@ -59,6 +61,19 @@ def actualizar_base_datos():
         )
     """)
 
+    # 2. Tabla de Clientes (Aseguramos que exista)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cedula TEXT UNIQUE NOT NULL,
+            nombre TEXT,
+            apellido TEXT,
+            telefono TEXT,
+            direccion TEXT
+        )
+    """)
+
+    # 3. Tabla de Pedidos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +90,7 @@ def actualizar_base_datos():
         )
     """)
 
-    # Aseguramos TODAS las columnas por si la tabla ya existía
+    # Columnas adicionales por si la tabla venía de versiones antiguas
     columnas_necesarias = [
         ("cedula_cliente", "TEXT"),
         ("tamano_cilindro", "TEXT"),
@@ -92,12 +107,13 @@ def actualizar_base_datos():
         try:
             cursor.execute(f"ALTER TABLE pedidos ADD COLUMN {columna} {tipo}")
         except sqlite3.OperationalError:
-            pass
+            pass  # Ignoramos si la columna ya existe
 
     conn.commit()
     conn.close()
 
 actualizar_base_datos()
+
 # =========================================================
 # 1. INICIO / DASHBOARD
 # =========================================================
@@ -138,7 +154,6 @@ def buscar_cliente(cedula):
     return jsonify({'encontrado': False})
 
 # =========================================================
-## =========================================================
 # 3. REGISTRO DE PEDIDOS
 # =========================================================
 @app.route('/nuevo_pedido')
@@ -158,18 +173,18 @@ def nuevo_pedido():
     except Exception as e:
         print(f"--> ERROR AL LEER TASA: {e}")
 
-    # Enviamos ambas variables por compatibilidad con cualquier parte de la plantilla
     return render_template('pedidos.html', tasa_cambio=tasa_actual, tasa_dolar=tasa_actual)
-# =========================================================
 
-#=========================================================
-# 3.1 PROCESAR Y GUARDAR/CONFIRMAR PEDIDO (CON AUTOCREACIÓN DE CLIENTE)
+# =========================================================
+# 3.1 PROCESAR Y GUARDAR/CONFIRMAR PEDIDO
 # =========================================================
 @app.route('/guardar_pedido', methods=['POST'])
 @app.route('/confirmar_pedido', methods=['POST'])
 def procesar_pedido():
     try:
         data = request.get_json()
+        print(f"--> DATOS RECIBIDOS EN BACKEND: {data}")
+
         if not data:
             return jsonify({'success': False, 'status': 'error', 'message': 'No se recibieron datos'}), 400
 
@@ -177,20 +192,26 @@ def procesar_pedido():
         cursor = conn.cursor()
 
         # Extraer campos
-        cedula = data.get('cedula_cliente') or data.get('cedula') or ""
-        tamano = data.get('tamano_cilindro') or data.get('tamano') or ""
-        cantidad = data.get('cantidad_bombonas') or data.get('cantidad', 1)
-        monto_bs = data.get('monto_bs') or data.get('monto', 0.0)
-        metodo = data.get('metodo_pago') or data.get('metodo') or ""
-        referencia = data.get('referencia', '')
-        tickets = data.get('tickets', '')
-        nombre = data.get('nombre', 'Cliente')
-        apellido = data.get('apellido', 'Registrado')
-        telefono = data.get('telefono', '')
-        direccion = data.get('direccion', '')
+        cedula = str(data.get('cedula_cliente') or data.get('cedula') or "").strip()
+        tamano = str(data.get('tamano_cilindro') or data.get('tamano') or "10kg").strip()
+        cantidad = int(data.get('cantidad_bombonas') or data.get('cantidad') or 1)
+        
+        raw_monto = data.get('monto_bs') or data.get('monto') or 0.0
+        try:
+            monto_bs = float(str(raw_monto).replace(',', '.'))
+        except ValueError:
+            monto_bs = 0.0
+
+        metodo = str(data.get('metodo_pago') or data.get('metodo') or "").strip()
+        referencia = str(data.get('referencia') or "").strip()
+        tickets = str(data.get('tickets') or "").strip()
+        nombre = str(data.get('nombre') or 'Cliente').strip()
+        apellido = str(data.get('apellido') or 'Registrado').strip()
+        telefono = str(data.get('telefono') or "").strip()
+        direccion = str(data.get('direccion') or "").strip()
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 1. Asegurar que el cliente exista en la tabla 'clientes'
+        # 1. Registrar o actualizar cliente si no existe
         if cedula:
             cursor.execute("SELECT cedula FROM clientes WHERE cedula = ?", (cedula,))
             if not cursor.fetchone():
@@ -199,7 +220,7 @@ def procesar_pedido():
                     VALUES (?, ?, ?, ?, ?)
                 """, (cedula, nombre, apellido, telefono, direccion))
 
-        # 2. Registrar el pedido en la tabla 'pedidos'
+        # 2. Insertar pedido en la tabla de pedidos
         cursor.execute("""
             INSERT INTO pedidos (
                 cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
@@ -219,15 +240,15 @@ def procesar_pedido():
         ))
 
         conn.commit()
-        conn.commit()
         conn.close()
 
-        print(f"--> ¡PEDIDO GUARDADO Y CLIENTE SINCRONIZADO PARA CÉDULA: {cedula}!")
+        print(f"--> ¡PEDIDO REGISTRADO EXITOSAMENTE PARA CÉDULA: {cedula}!")
         return jsonify({'success': True, 'status': 'success', 'message': 'Pedido confirmado con éxito'})
 
     except Exception as e:
-        print(f"--> ERROR AL CONFIRMAR PEDIDO: {e}")
-        return jsonify({'success': False, 'status': 'error', 'message': str(e)}), 500
+        print(f"❌❌ ERROR GRAVE EN SQLITE AL INSERTAR PEDIDO: {e}")
+        return jsonify({'success': False, 'status': 'error', 'message': f"Error en base de datos: {str(e)}"}), 500
+
 # =========================================================
 # 4. PRECIOS & TASA
 # =========================================================
@@ -254,7 +275,7 @@ def precios():
 
         return redirect(url_for('precios'))
 
-    tasa_actual = ""  # Queda vacío si no hay registro previo en la BD
+    tasa_actual = ""
     try:
         conn = sqlite3.connect("estebita.db", timeout=10)
         cursor = conn.cursor()
@@ -388,8 +409,6 @@ def reporte_diario():
     )
 
 # =========================================================
-## =========================================================
-## =========================================================
 # 7. Seguimiento Pedidos / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
@@ -399,13 +418,11 @@ def seguimiento_pedidos():
     ref_punto = request.args.get("ref_punto", "").strip()
     estado = request.args.get("estado", "").strip()
 
-    # Preparamos la conversión de fecha antes de armar los parámetros
     fecha_filtro_db = ""
     if fecha_input:
         try:
             if "/" in fecha_input:
                 partes = fecha_input.split("/")
-                # Convierte DD/MM/YYYY a YYYY-MM-DD
                 fecha_filtro_db = f"{partes[2]}-{partes[1]}-{partes[0]}"
             else:
                 fecha_filtro_db = fecha_input
@@ -451,7 +468,6 @@ def seguimiento_pedidos():
         cursor.execute(query, params)
         pedidos_raw = cursor.fetchall()
         
-        # Formatear la fecha a DD/MM/YYYY para la tabla en HTML
         pedidos = []
         for row in pedidos_raw:
             p = dict(row)
@@ -479,7 +495,7 @@ def seguimiento_pedidos():
         ref_punto=ref_punto,
         estado_filtro=estado
     )
-    
+
 # =========================================================
 # RUTA TEMPORAL REPARAR USUARIO
 # =========================================================
