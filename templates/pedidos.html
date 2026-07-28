@@ -145,9 +145,17 @@ function buscarCliente() {
         .then(data => {
             divRes.style.display = 'block';
 
-            if (data.existe) {
+            // ✅ CORREGIDO: Evaluamos data.encontrado que es lo que devuelve app.py
+            if (data.encontrado) {
                 // CASO 1: CLIENTE EXISTE
-                clienteSeleccionadoId = data.cedula || data.id;
+                clienteSeleccionadoId = cedula;
+                
+                // Rellenamos de forma transparente los campos ocultos
+                document.getElementById('nombre').value = data.nombre || '';
+                document.getElementById('apellido').value = data.apellido || '';
+                document.getElementById('telefono').value = data.telefono || '';
+                document.getElementById('direccion').value = data.direccion || '';
+
                 divRes.innerHTML = `
                     <div class="alert alert-success m-0">
                         <strong>¡Cliente encontrado!</strong><br>
@@ -160,8 +168,8 @@ function buscarCliente() {
                 desbloquearPasoBombonas();
 
             } else {
-                // CASO 2: CLIENTE NUEVO (DESBLOQUEO AUTOMÁTICO)
-                clienteSeleccionadoId = null;
+                // CASO 2: CLIENTE NUEVO
+                clienteSeleccionadoId = cedula;
                 divRes.innerHTML = `
                     <div class="alert alert-warning m-0">
                         <strong>Cliente no registrado.</strong><br>
