@@ -409,6 +409,7 @@ def reporte_diario():
     )
 
 # =========================================================
+# # =========================================================
 # 7. Seguimiento Pedidos / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
@@ -418,22 +419,12 @@ def seguimiento_pedidos():
     ref_punto = request.args.get("ref_punto", "").strip()
     estado = request.args.get("estado", "").strip()
 
-    fecha_filtro_db = ""
-    if fecha_input:
-        try:
-            if "/" in fecha_input:
-                partes = fecha_input.split("/")
-                fecha_filtro_db = f"{partes[2]}-{partes[1]}-{partes[0]}"
-            else:
-                fecha_filtro_db = fecha_input
-        except Exception:
-            fecha_filtro_db = fecha_input
-
     conn = sqlite3.connect("estebita.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     try:
+        # Consulta base
         query = """
             SELECT 
                 p.*, 
@@ -441,14 +432,14 @@ def seguimiento_pedidos():
                 COALESCE(c.apellido, '') AS apellido, 
                 COALESCE(c.telefono, '') AS telefono 
             FROM pedidos p
-            LEFT JOIN clientes c ON CAST(p.cedula_cliente AS TEXT) = CAST(c.cedula AS TEXT)
+            LEFT JOIN clientes c ON TRIM(CAST(p.cedula_cliente AS TEXT)) = TRIM(CAST(c.cedula AS TEXT))
             WHERE 1=1
         """
         params = []
 
         if fecha_input:
             query += " AND (p.fecha LIKE ? OR DATE(p.fecha) = ?)"
-            params.extend([f"%{fecha_input}%", fecha_filtro_db])
+            params.extend([f"%{fecha_input}%", fecha_input])
 
         if busqueda:
             query += " AND (p.cedula_cliente LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ?)"
@@ -467,10 +458,12 @@ def seguimiento_pedidos():
 
         cursor.execute(query, params)
         pedidos_raw = cursor.fetchall()
+        print(f"--> [SEGUIMIENTO] Total registros encontrados en SQL: {len(pedidos_raw)}")
         
         pedidos = []
         for row in pedidos_raw:
             p = dict(row)
+            # Formato de fecha
             if p.get("fecha"):
                 try:
                     fecha_obj = datetime.strptime(str(p["fecha"]).split()[0], "%Y-%m-%d")
@@ -479,10 +472,13 @@ def seguimiento_pedidos():
                     p["fecha_formateada"] = p["fecha"]
             else:
                 p["fecha_formateada"] = ""
+            
+            # Asegurar campo bombonas visual
+            p["cant_final"] = p.get("cantidad_bombonas") or p.get("cantidad") or 1
             pedidos.append(p)
 
     except Exception as e:
-        print("Error en consulta de Seguimiento Pedidos:", e)
+        print("❌ Error en consulta de Seguimiento Pedidos:", e)
         pedidos = []
     finally:
         conn.close()
