@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- 1. CORREGIDO: Usamos la variable {{ tasa_cambio }} que viene de app.py -->
+<!-- 1. Usamos la variable {{ tasa_cambio }} que viene de app.py -->
 <input type="hidden" id="tasa_cambio" value="{{ tasa_cambio }}">
 
 <div class="container mt-3" style="max-width: 500px;">
     <h3 class="text-center mb-1"><i class="fa-solid fa-cart-plus text-primary me-2"></i> Registrar Nuevo Pedido</h3>
 
-    <!-- 2. AQUÍ COLOCAMOS EL CARTEL DE LA TASA (Debajo del título) -->
+    <!-- 2. CARTEL DE LA TASA -->
     <div class="text-center mb-3">
       {% if tasa_cambio %}
         <span class="badge bg-success fs-6"><i class="fa-solid fa-coins me-1"></i> Tasa Oficial: {{ tasa_cambio }} Bs.</span>
@@ -16,9 +16,6 @@
       {% endif %}
     </div>
 
-    <!-- PASO 1: CÉDULA / CLIENTE -->
-    <div class="card p-3 shadow-sm mb-3" id="paso-cliente">
-    ...
     <!-- PASO 1: CÉDULA / CLIENTE -->
     <div class="card p-3 shadow-sm mb-3" id="paso-cliente">
         <h5 class="card-title mb-3">1. Identificación del Cliente</h5>
@@ -145,12 +142,10 @@ function buscarCliente() {
         .then(data => {
             divRes.style.display = 'block';
 
-            // ✅ CORREGIDO: Evaluamos data.encontrado que es lo que devuelve app.py
             if (data.encontrado) {
                 // CASO 1: CLIENTE EXISTE
                 clienteSeleccionadoId = cedula;
                 
-                // Rellenamos de forma transparente los campos ocultos
                 document.getElementById('nombre').value = data.nombre || '';
                 document.getElementById('apellido').value = data.apellido || '';
                 document.getElementById('telefono').value = data.telefono || '';
@@ -164,7 +159,7 @@ function buscarCliente() {
                         <b>Dirección:</b> ${data.direccion || 'Sin registro'}
                     </div>
                 `;
-                secCliente.style.display = 'none'; // Ocultamos formulario de registro
+                secCliente.style.display = 'none';
                 desbloquearPasoBombonas();
 
             } else {
@@ -177,7 +172,6 @@ function buscarCliente() {
                     </div>
                 `;
 
-                // Mostramos casillas y las limpiamos
                 secCliente.style.display = 'block';
                 document.getElementById('nombre').value = '';
                 document.getElementById('apellido').value = '';
@@ -290,7 +284,6 @@ function validarTicketsExistentes() {
 }
 
 function validarYPasarAPago() {
-    // Si el cliente es nuevo, exigimos Nombre y Apellido obligatoriamente
     if (!clienteSeleccionadoId) {
         const nom = document.getElementById('nombre').value.trim();
         const ape = document.getElementById('apellido').value.trim();
@@ -364,55 +357,77 @@ function seleccionarMetodo(metodo) {
 }
 
 function confirmarVenta() {
-    const refPunto = document.getElementById('ref_punto').value.trim();
-    let refFinal = refPunto;
+    try {
+        console.log("--> Iniciando proceso de confirmación de venta...");
 
-    if (!refPunto) {
-        alert("⚠️ Debe ingresar el número de referencia del Punto de Venta.");
-        return;
-    }
-
-    if (metodoPagoSeleccionado === 'Pago Móvil') {
-        const refPM = document.getElementById('ref_pagomovil').value.trim();
-        if (!refPM) {
-            alert("⚠️ Debe ingresar el número de referencia del Pago Móvil recibido.");
+        const cedulaActual = clienteSeleccionadoId || document.getElementById('cedula_input').value.trim();
+        if (!cedulaActual) {
+            alert("⚠️ Por favor busque o ingrese primero la cédula del cliente.");
             return;
         }
-        refFinal = `PM: ${refPM} / Punto: ${refPunto}`;
-    }
 
-    const ticketsArr = Array.from(document.querySelectorAll('.ticket-input')).map(i => i.value.trim());
+        const refPunto = document.getElementById('ref_punto').value.trim();
+        let refFinal = refPunto;
 
-    // Si no existía el cliente, enviamos su cédula e información
-    const payload = {
-        cedula_cliente: clienteSeleccionadoId || document.getElementById('cedula_input').value.trim(),
-        nombre: document.getElementById('nombre').value.trim(),
-        apellido: document.getElementById('apellido').value.trim(),
-        telefono: document.getElementById('telefono').value.trim(),
-        direccion: document.getElementById('direccion').value.trim(),
-        tamano_cilindro: document.getElementById('tamano_cilindro').value,
-        cantidad_bombonas: document.getElementById('cantidad_bombonas').value,
-        monto_bs: document.getElementById('monto_bs').value,
-        tickets: ticketsArr.join(', '),
-        metodo_pago: metodoPagoSeleccionado,
-        referencia: refFinal
-    };
-
-    fetch('/guardar_pedido', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert("✅ ¡Venta y Pedido Registrados Exitosamente!");
-            window.location.href = '/seguimiento_pedidos';
-        } else {
-            alert("❌ Error al registrar venta: " + data.message);
+        if (!refPunto) {
+            alert("⚠️ Debe ingresar el número de referencia del Punto de Venta.");
+            return;
         }
-    })
-    .catch(err => alert("Error de conexión al guardar el pedido."));
+
+        if (metodoPagoSeleccionado === 'Pago Móvil') {
+            const refPM = document.getElementById('ref_pagomovil').value.trim();
+            if (!refPM) {
+                alert("⚠️ Debe ingresar el número de referencia del Pago Móvil recibido.");
+                return;
+            }
+            refFinal = `PM: ${refPM} / Punto: ${refPunto}`;
+        }
+
+        const ticketsArr = Array.from(document.querySelectorAll('.ticket-input')).map(i => i.value.trim());
+
+        const payload = {
+            cedula_cliente: cedulaActual,
+            nombre: document.getElementById('nombre').value.trim(),
+            apellido: document.getElementById('apellido').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            direccion: document.getElementById('direccion').value.trim(),
+            tamano_cilindro: document.getElementById('tamano_cilindro').value,
+            cantidad_bombonas: document.getElementById('cantidad_bombonas').value,
+            monto_bs: document.getElementById('monto_bs').value,
+            tickets: ticketsArr.join(', '),
+            metodo_pago: metodoPagoSeleccionado || 'Efectivo',
+            referencia: refFinal
+        };
+
+        console.log("--> Enviando payload al servidor:", payload);
+
+        fetch('/guardar_pedido', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            console.log("--> Respuesta HTTP recibida:", res.status);
+            return res.json();
+        })
+        .then(data => {
+            console.log("--> Respuesta JSON del servidor:", data);
+            if (data.status === 'success') {
+                alert("✅ ¡Venta y Pedido Registrados Exitosamente!");
+                window.location.href = '/seguimiento_pedidos';
+            } else {
+                alert("❌ Error al registrar venta: " + (data.message || "Error desconocido"));
+            }
+        })
+        .catch(err => {
+            console.error("❌ Error en fetch:", err);
+            alert("Error de conexión al guardar el pedido.");
+        });
+
+    } catch (errorEx) {
+        console.error("❌ Excepción detectada en JavaScript:", errorEx);
+        alert("Ocurrió un error en la aplicación web: " + errorEx.message);
+    }
 }
 </script>
 {% endblock %}
