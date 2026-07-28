@@ -64,7 +64,6 @@ def actualizar_base_datos():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cliente_id TEXT,
             cedula_cliente TEXT,
             tamano_cilindro TEXT,
             cantidad INTEGER,
@@ -193,7 +192,7 @@ def procesar_pedido():
 
         # 1. Asegurar que el cliente exista en la tabla 'clientes'
         if cedula:
-            cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
+            cursor.execute("SELECT cedula FROM clientes WHERE cedula = ?", (cedula,))
             if not cursor.fetchone():
                 cursor.execute("""
                     INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion)
@@ -203,7 +202,7 @@ def procesar_pedido():
         # 2. Registrar el pedido en la tabla 'pedidos'
         cursor.execute("""
             INSERT INTO pedidos (
-                cliente_id, cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
+                cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
                 monto_bs, fecha, estado, tickets, metodo_pago, referencia
             ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Recibido', ?, ?, ?)
         """, (cedula, cedula, tamano, cantidad, cantidad, monto_bs, fecha_actual, tickets, metodo, referencia))
