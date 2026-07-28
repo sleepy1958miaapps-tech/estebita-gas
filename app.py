@@ -8,6 +8,7 @@ app = Flask(__name__)
 app.secret_key = "estebita_gas_clave_super_secreta_2026"
 
 # =========================================================
+# =========================================================
 # 🔐 LISTA DE USUARIOS PERMITIDOS Y CONTRASEÑAS
 # =========================================================
 USUARIOS = {
@@ -25,7 +26,6 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
@@ -47,9 +47,7 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
-# =========================================================
-# ACTUALIZACIÓN SEGURA DE BASE DE DATOS
-# =========================================================
+
 def actualizar_base_datos():
     conn = sqlite3.connect("estebita.db")
     cursor = conn.cursor()
@@ -77,8 +75,11 @@ def actualizar_base_datos():
         )
     """)
 
+    # Aseguramos TODAS las columnas por si la tabla ya existía
     columnas_necesarias = [
         ("cedula_cliente", "TEXT"),
+        ("tamano_cilindro", "TEXT"),
+        ("cantidad", "INTEGER"),
         ("cantidad_bombonas", "INTEGER"),
         ("monto_bs", "REAL DEFAULT 0.0"),
         ("estado", "TEXT DEFAULT 'Recibido'"),
@@ -97,7 +98,6 @@ def actualizar_base_datos():
     conn.close()
 
 actualizar_base_datos()
-
 # =========================================================
 # 1. INICIO / DASHBOARD
 # =========================================================
