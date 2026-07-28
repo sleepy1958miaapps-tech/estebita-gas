@@ -49,12 +49,12 @@
                   <a href="{{ url_for('index') }}"><i class="fa-solid fa-house me-2"></i>Inicio</a>
               
                   <!-- Enlaces corregidos -->
-                  <a href="{{ url_for('nuevo_pedido') }}"><i class="fa-solid fa-cart-plus me-2"></i>Registrar Pedido</a>
-                  <a href="{{ url_for('seguimiento_pedidos') }}"><i class="fa-solid fa-truck me-2"></i>Gestión de Pedidos</a>
-                  <a href="/clientes"><i class="fa-solid fa-users me-2"></i>Lista de Clientes</a>
-                  <a href="/reporte-diario"><i class="fa-solid fa-chart-line me-2"></i>Reporte Diario</a>
-                  <a href="/whatsapp"><i class="fa-brands fa-whatsapp me-2"></i>Notificaciones</a>
-                  <a href="/precios"><i class="fa-solid fa-tags me-2"></i>Configurar Precios</a>
+                    <a href="{{ url_for('nuevo_pedido') }}"><i class="fa-solid fa-cart-plus me-2"></i>Registrar Pedido</a>
+                    <a href="{{ url_for('seguimiento_pedidos') }}"><i class="fa-solid fa-truck me-2"></i>Seguimiento de Pedidos</a>
+                    <a href="/clientes"><i class="fa-solid fa-users me-2"></i>Lista de Clientes</a>
+                    <a href="/reporte-diario"><i class="fa-solid fa-chart-line me-2"></i>Reporte Diario</a>
+                    <a href="/whatsapp"><i class="fa-brands fa-whatsapp me-2"></i>Notificaciones</a>
+                    <a href="/precios"><i class="fa-solid fa-tags me-2"></i>Configurar Precios</a>
               
                   <!-- 2. Usuario activo y Botón para Cerrar Sesión -->
                   {% if session.get('usuario') %}

@@ -2,7 +2,8 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <h2 class="mb-4"><i class="bi bi-truck"></i> Gestión y Logística de Pedidos</h2>
+    <!-- ENCABEZADO ACTUALIZADO -->
+    <h2 class="mb-4"><i class="bi bi-truck"></i> Seguimiento de Pedidos</h2>
 
     <!-- PANEL DE BÚSQUEDA Y FILTROS -->
     <div class="card shadow-sm mb-4">
@@ -159,7 +160,7 @@ function cambiarEstadoLote(nuevoEstado) {
 
     fetch('/actualizar_estado_pedidos', {
         method: 'POST',
-        headers: { 'Content-Type': 'json/application' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             ids: seleccionados,
             nuevo_estado: nuevoEstado
@@ -167,11 +168,10 @@ function cambiarEstadoLote(nuevoEstado) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.status === 'success') {
+        if (data.status === 'success' || data.success) {
             location.reload();
         } else {
             alert("Error al actualizar: " + data.message);
-      
         }
     })
     .catch(err => alert("Error de conexión al servidor."));

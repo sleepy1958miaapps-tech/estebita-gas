@@ -162,8 +162,9 @@ def nuevo_pedido():
     # Enviamos ambas variables por compatibilidad con cualquier parte de la plantilla
     return render_template('pedidos.html', tasa_cambio=tasa_actual, tasa_dolar=tasa_actual)
 # =========================================================
-# =========================================================
-# 3.1 PROCESAR Y GUARDAR/CONFIRMAR PEDIDO
+
+#=========================================================
+# 3.1 PROCESAR Y GUARDAR/CONFIRMAR PEDIDO (CON AUTOCREACIÓN DE CLIENTE)
 # =========================================================
 @app.route('/guardar_pedido', methods=['POST'])
 @app.route('/confirmar_pedido', methods=['POST'])
@@ -176,27 +177,41 @@ def procesar_pedido():
         conn = sqlite3.connect("estebita.db", timeout=10)
         cursor = conn.cursor()
 
-        # Extraer campos adaptados a cualquier formato enviado por el JavaScript
-        cedula = data.get('cedula_cliente') or data.get('cedula')
-        tamano = data.get('tamano_cilindro') or data.get('tamano')
+        # Extraer campos
+        cedula = data.get('cedula_cliente') or data.get('cedula') or ""
+        tamano = data.get('tamano_cilindro') or data.get('tamano') or ""
         cantidad = data.get('cantidad_bombonas') or data.get('cantidad', 1)
         monto_bs = data.get('monto_bs') or data.get('monto', 0.0)
-        metodo = data.get('metodo_pago') or data.get('metodo')
+        metodo = data.get('metodo_pago') or data.get('metodo') or ""
         referencia = data.get('referencia', '')
         tickets = data.get('tickets', '')
+        nombre = data.get('nombre', 'Cliente')
+        apellido = data.get('apellido', 'Registrado')
+        telefono = data.get('telefono', '')
+        direccion = data.get('direccion', '')
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # 1. Asegurar que el cliente exista en la tabla 'clientes'
+        if cedula:
+            cursor.execute("SELECT id FROM clientes WHERE cedula = ?", (cedula,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO clientes (cedula, nombre, apellido, telefono, direccion)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (cedula, nombre, apellido, telefono, direccion))
+
+        # 2. Registrar el pedido en la tabla 'pedidos'
         cursor.execute("""
             INSERT INTO pedidos (
-                cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
+                cliente_id, cedula_cliente, tamano_cilindro, cantidad, cantidad_bombonas, 
                 monto_bs, fecha, estado, tickets, metodo_pago, referencia
-            ) VALUES (?, ?, ?, ?, ?, ?, 'Recibido', ?, ?, ?)
-        """, (cedula, tamano, cantidad, cantidad, monto_bs, fecha_actual, tickets, metodo, referencia))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Recibido', ?, ?, ?)
+        """, (cedula, cedula, tamano, cantidad, cantidad, monto_bs, fecha_actual, tickets, metodo, referencia))
 
         conn.commit()
         conn.close()
 
-        print("--> ¡PEDIDO CONFIRMADO Y GUARDADO EN SQLITE!")
+        print(f"--> ¡PEDIDO GUARDADO Y CLIENTE SINCRONIZADO PARA CÉDULA: {cedula}!")
         return jsonify({'success': True, 'status': 'success', 'message': 'Pedido confirmado con éxito'})
 
     except Exception as e:
@@ -362,11 +377,11 @@ def reporte_diario():
     )
 
 # =========================================================
-# 7. GESTIÓN DE PEDIDOS / LOGÍSTICA
+# 7. Seguimiento Pedidos / LOGÍSTICA
 # =========================================================
 @app.route('/seguimiento_pedidos')
 def seguimiento_pedidos():
-    fecha_actual = request.args.get("fecha", "")
+    fecha_input = request.args.get("fecha", "").strip()
     busqueda = request.args.get("busqueda", "").strip()
     ref_punto = request.args.get("ref_punto", "").strip()
     estado = request.args.get("estado", "").strip()
@@ -375,22 +390,34 @@ def seguimiento_pedidos():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # Convertir fecha de entrada (DD/MM/YYYY o YYYY-MM-DD) al formato de la BD (YYYY-MM-DD)
+    fecha_filtro_db = ""
+    if fecha_input:
+        try:
+            if "/" in fecha_input:
+                partes = fecha_input.split("/")
+                fecha_filtro_db = f"{partes[2]}-{partes[1]}-{partes[0]}"  # Convierte DD/MM/YYYY a YYYY-MM-DD
+            else:
+                fecha_filtro_db = fecha_input
+        except Exception:
+            fecha_filtro_db = fecha_input
+
     try:
         query = """
             SELECT 
                 p.*, 
-                c.nombre, 
-                c.apellido, 
-                c.telefono 
+                COALESCE(c.nombre, 'Cliente') AS nombre, 
+                COALESCE(c.apellido, '') AS apellido, 
+                COALESCE(c.telefono, '') AS telefono 
             FROM pedidos p
             LEFT JOIN clientes c ON CAST(p.cedula_cliente AS TEXT) = CAST(c.cedula AS TEXT)
             WHERE 1=1
         """
         params = []
 
-        if fecha_actual:
+        if fecha_filtro_db:
             query += " AND DATE(p.fecha) = ?"
-            params.append(fecha_actual)
+            params.append(fecha_filtro_db)
 
         if busqueda:
             query += " AND (p.cedula_cliente LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ?)"
@@ -409,10 +436,24 @@ def seguimiento_pedidos():
 
         cursor.execute(query, params)
         pedidos_raw = cursor.fetchall()
-        pedidos = [dict(row) for row in pedidos_raw]
+        
+        # Formatear la fecha a DD/MM/YYYY para mostrarla en la pantalla
+        pedidos = []
+        for row in pedidos_raw:
+            p = dict(row)
+            if p.get("fecha"):
+                try:
+                    # Convierte "2026-07-27 14:30:00" -> "27/07/2026"
+                    fecha_obj = datetime.strptime(p["fecha"].split()[0], "%Y-%m-%d")
+                    p["fecha_formateada"] = fecha_obj.strftime("%d/%m/%Y")
+                except Exception:
+                    p["fecha_formateada"] = p["fecha"]
+            else:
+                p["fecha_formateada"] = ""
+            pedidos.append(p)
 
     except Exception as e:
-        print("Error en consulta de Gestión de Pedidos:", e)
+        print("Error en consulta de Seguimiento Pedidos:", e)
         pedidos = []
     finally:
         conn.close()
@@ -420,37 +461,11 @@ def seguimiento_pedidos():
     return render_template(
         "seguimiento_pedidos.html", 
         pedidos=pedidos,
-        fecha_actual=fecha_actual,
+        fecha_actual=fecha_input,
         busqueda=busqueda,
         ref_punto=ref_punto,
         estado_filtro=estado
     )
-
-@app.route('/actualizar_estado_pedidos', methods=['POST'])
-def actualizar_estado_pedidos():
-    try:
-        data = request.get_json()
-        ids = data.get('ids', [])
-        nuevo_estado = data.get('nuevo_estado', '')
-
-        if not ids or not nuevo_estado:
-            return jsonify({'status': 'error', 'message': 'Datos incompletos'}), 400
-
-        conn = sqlite3.connect("estebita.db")
-        cursor = conn.cursor()
-        
-        placeholders = ','.join(['?'] * len(ids))
-        query = f"UPDATE pedidos SET estado = ? WHERE id IN ({placeholders})"
-        
-        cursor.execute(query, [nuevo_estado] + ids)
-        conn.commit()
-        conn.close()
-
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print("Error al actualizar estados:", e)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
 # =========================================================
 # RUTA TEMPORAL REPARAR USUARIO
 # =========================================================
